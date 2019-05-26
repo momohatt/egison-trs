@@ -1,0 +1,259 @@
+; Implementation of resolution principle for first-order logic in Egison
+
+(define $unordered-pair
+ (lambda [$m]
+  (matcher
+    {[<pair $ $> [m m] {[[$x $y] {[x y] [y x]}]}]
+     [$ [something] {[$tgt {tgt}]}]})))
+
+(define $positive?
+  (lambda $x (gt? x 0)))
+
+;(define $term (algebraic-data-matcher {<var integer> <compound string (list term)>}))
+
+(define $term
+  (matcher
+    {
+     [<var $> integer
+      {[<Var $i> {i}]
+       [_ {}]}]
+     [<compound $ $> [string (list term)]
+      {[<Compound $s $l> {[s l]}]
+       [_ {}]}]
+     [<unify ,$t $> something
+      {[$s (unify t s)]}]
+     [$ something
+      {[$tgt {tgt}]}]
+      }))
+
+(define $app
+  (cambda $xs
+    (match xs (list something)
+      {[<cons $x $xs>
+        <Compound x xs>]})))
+
+(define $var
+  (lambda $n
+    <Var n>))
+
+(define $x 0)
+(define $y 1)
+(define $z 2)
+(define $w 3)
+; P(g(x), y)
+(define $t1 (app "P" (app "g" (var x)) (var y)))
+; P(g(g(c)), c)
+; what is "c"?
+(define $t2 (app "P" (app "g" (app "g" (app "c"))) (app "c")))
+
+(define $occur
+  (pattern-function [$v]
+    (| <var v>
+       <compound _ <join _ <cons (occur v) _>>>)))
+
+(define $test-occur
+  (lambda [$v $t]
+    (match t term
+      {[(occur ,v) #t]
+       [_ #f]})))
+
+(assert "occur1" (test-occur x t1))
+(assert "occur2" (not (test-occur z t1)))
+
+(define $fv
+  (match-all-lambda term
+    {[(occur $v) v]}))
+
+(assert "fv1"
+  (match (fv t1) (multiset something)
+   {[,{0 1} #t]
+    [_ #f]}))
+
+(assert-equal "fv2"
+  (fv t2)
+  {})
+
+(define $subst
+  (match-lambda [something term]
+    {[[$u <var $n>]
+      (match u (multiset [integer term])
+        {[<cons [,n $t] _> t] ; subst規則があればsubst
+         [_ <Var n>]})]       ; なければそのまま
+     [[$u <compound $f $xs>]
+      <Compound f (map (lambda $x (subst u x)) xs)>]}))
+
+; [z / x, x / y] P(g(x), y) = P(g(z), x)
+(assert-equal "subst1"
+  (subst {[y <Var x>] [x <Var z>]} t1)
+  <Compound "P" {<Compound "g" {<Var 2>}> <Var 0>}>)
+
+; [z / z] P(g(x), y) = P(g(x), y)
+(assert-equal "subst2"
+  (subst {[z <Var z>]} t1)
+  <Compound "P" {<Compound "g" {<Var 0>}> <Var 1>}>)
+
+(define $unify
+  (match-lambda (unordered-pair term)
+    {
+     [<pair <var $n> <var ,n>>
+      {{}}] ; success
+     [<pair <var $n> (& $t !(occur ,n))>
+      {{[n t]}}]
+     [<pair <compound $f <nil>> <compound ,f <nil>>>
+      {{}}] ; success
+     [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
+      (match (unify x y) (list something)
+        {[,{} {}] ; failure
+         [<cons $u1 _> ; unifiableな場合、制約はsingletonになっている
+          (match (unify (subst u1 <Compound f xs>) (subst u1 <Compound f ys>)) (list something)
+               {[,{} {}] ; failure
+                [<cons $u2 _> {{@u1 @u2}}]} ; 
+          )]})]
+     [_ {}] ; failure
+    }))
+
+; t1 = P(g(x), y)
+; t2 = P(g(g(c)), c)
+(assert-equal "unify1" (unify (var x) (var x)) {{}})
+(assert-equal "unify2" (unify t1 (var z)) {{[z t1]}})
+; {[x, g(c)], [y, c]}
+(assert-equal "unify3" (unify t1 t2) {{[0 <Compound "g" {<Compound "c" {}>}>] [1 <Compound "c" {}>]}})
+(assert-equal "unify4" (unify (var x) t1) {})
+
+(define $literal
+  (algebraic-data-matcher
+    ; intergerは1ならそのまま、-1ならnegateされる
+    {<lit integer term>}))
+
+(define $fv-clause
+  (match-all-lambda (multiset literal)
+    {[<cons <lit _ (occur $v)> _> v]}))
+
+(define $subst-clause
+  (match-all-lambda [something (multiset literal)]
+    {[[$u <cons <lit $p $t> _>]
+      <Lit p (subst u t)>]}))
+
+(define $resolution
+  (match-all-lambda (multiset (multiset literal))
+    {[<cons <cons <lit ,1 $t> $xs>
+       <cons <cons <lit ,-1 (& <unify ,t $σ> $s)> $ys>
+         _>>
+      {@(subst-clause σ xs) @(subst-clause σ ys)}]}))
+
+; TODO: これはなぜいるの？
+(define $rename-problem
+  (match-lambda [integer (list (list literal))]
+    {[[$n <nil>]
+      {}]
+     [[$n <cons $c $cs>]
+      (let {[$u (zip (fv-clause c)
+                     ; n, n+1, ... の新しいvarを生成
+                     (map (lambda $x <Var x>) (from n)))]}
+        (cons (subst-clause u c)
+              (rename-problem (+ n (length u)) cs)))]}))
+
+(define $solve
+  (match-lambda (multiset (multiset literal))
+    {[<cons <nil> _>
+      <REFUTE>]
+     [$p
+      (let {[$q (resolution (rename-problem 0 p))]}
+        (if (include?/m (multiset literal) p q) ; q \subseteq? p
+          <SATURATED>
+          (solve {@p @q})))]}))
+
+(define $t3 (app "P" (var x) (app "f" (var x) (var y))))
+(define $t4 (app "P" (app "c") (var y)))
+
+; 1. Problem:
+; (\forall x y. \exists z. P(g(x),y) \to P(x,z))
+; \land (\forall y. \lnot P(c,y)) \land P(g(g(c)),c)
+; 2. Prenex normal form
+; \forall x y. \exists z. (P(g(x),y) \to P(x,z))
+; \land \lnot P(c,y) \land P(g(g(c)),c)
+; 3. Skolemization
+; \forall x y. (P(g(x),y) \to P(x,f(x,y))) \land \lnot P(c,y) \land P(g(g(c)),c)
+; 4. Conjunction normal form
+; (\lnot P(g(x),y) \lor P(x,f(x,y))) \land \lnot P(c,y) \land P(g(g(c)),c)
+(define $p1 {{<Lit -1 t1> <Lit 1 t3>} {<Lit -1 t4>} {<Lit 1 t2>}})
+
+(assert-equal "solve1"
+  (solve p1)
+  <REFUTE>)
+
+; Drinker's paradox
+; 1. \lnot \exists x. D(x) \to \forall y. D(y)
+; 2. \forall x. \exists y. D(x) \land \lnot D(y)
+; 3. \forall x. D(x) \land \lnot D(c)
+; 4. D(x) \land \lnot D(c)
+(define $p2
+  {{<Lit 1 (app "D" (var x))>} {<Lit -1 (app "D" (app "c"))>}})
+
+(assert-equal "solve2"
+  (solve p2)
+  <REFUTE>)
+
+; Recall the axioms of groups:
+; (1) (x*y)*z = x*(y*z)
+; (2) x*(x^-1)= 1
+; (3) (x^-1)*x = 1
+; (4) x*1 = x
+; (5) 1*x = x
+; It is known that (3) and (5) above are redundant, i.e., provable from other axioms. Let's prove this!
+
+(define $eql (lambda [$x $y] (app "=" x y)))
+(define $p (lambda [$x $y] (app "p" x y))) ; product
+(define $i (lambda $x (app "i" x)))        ; inverse
+(define $e (app "e"))
+(define $e1 (app "e1"))
+(define $e2 (app "e2"))
+
+; (a) axioms of groups
+; - p(p(x,y),z) = p(x,p(y,z))
+; - p(x,i(x)) = e
+; - p(x,e) = x
+; (b) axioms of equality
+; - x = x
+; - \lnot (x = y) \lor (y = x)
+; - \lnot (x = y) \lor lnot (y = z) \lor (x = z)
+; - \lnot (x = y) \lnot (z = w) \lor (p(x,z) = p(y,w))
+; - \lnot (x = y) \lor (i(x) = i(y))
+; (c) (negation) of the goal
+; - \lnot (p(i(e1),e1) = e) \lor \lnot (p(e,e2) = e2)
+
+(define $axioms-of-groups
+  {{<Lit 1 (eql (p (p (var x) (var y)) (var z)) (p (var x) (p (var y) (var z))))>}
+   {<Lit 1 (eql (p (var x) (i (var x))) e)>}
+   {<Lit 1 (eql (p (var x) e) (var x))>}
+  })
+
+(define $axioms-of-equality
+  {{<Lit 1 (eql (var x) (var x))>}
+   {<Lit -1 (eql (var x) (var y))> <Lit 1 (eql (var y) (var x))>}
+   {<Lit -1 (eql (var x) (var y))> <Lit -1 (eql (var y) (var z))> <Lit 1 (eql (var x) (var z))>}
+   {<Lit -1 (eql (var x) (var y))> <Lit -1 (eql (var z) (var w))> <Lit 1 (eql (p (var x) (var z)) (p (var y) (var w)))>}
+   {<Lit -1 (eql (var x) (var y))> <Lit 1 (eql (i (var x)) (i (var y)))>}
+  })
+
+; (1) (2) (4) |= (5)
+(define $p3
+  {@axioms-of-groups
+   @axioms-of-equality
+
+   ; (negation of) the goal: e * x = x
+   {<Lit -1 (eql (p e e1) e1)>}
+  })
+
+(assert-equal "solve3" (solve p3) <REFUTE>)
+
+; (1) (2) (4) |= (3)
+(define $p4
+  {@axioms-of-groups
+   @axioms-of-equality
+
+   ; (negation of) the goal: x^-1 * x = e
+   {<Lit -1 (eql (p (i e2) e2) e)>}
+  })
+
+(assert-equal "solve4" (solve p4) <REFUTE>)

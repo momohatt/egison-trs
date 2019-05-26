@@ -1,0 +1,23 @@
+(load-file "DPResolution.egi")
+
+(define $problem
+  {; Issac is a boy
+   {<Lit 1 (app "B" (app "i"))>}
+   ; Kate is a girl
+   {<Lit 1 (app "G" (app "k"))>}
+   ; Joe's friends are all tall
+   {<Lit -1 (app "F" (app "j") (var x))> <Lit 1 (app "T" (var x))>}
+   ; Harry loves any girl that is tall
+   {<Lit -1 (app "G" (var y))> <Lit -1 (app "T" (var y))> <Lit 1 (app "L" (app "h") (var y))>}
+   ; Issac is a friend of Joe
+   {<Lit 1 (app "F" (app "j") (app "i"))>}
+   ; Kate is a friend of Joe
+   {<Lit 1 (app "F" (app "j") (app "k"))>}
+
+   ; question: does Harry love any of Joe's friends? If he does, who does he love?
+   {<Lit -1 (app "L" (app "h") (var z))> <Lit -1 (app "F" (app "j") (var z))>}
+  })
+
+(assert-equal "solve5"
+  (solve problem)
+  <REFUTE>)

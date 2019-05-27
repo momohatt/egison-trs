@@ -13,8 +13,7 @@
 
 (define $term
   (matcher
-    {
-     [<var $> integer
+    {[<var $> integer
       {[<Var $i> {i}]
        [_ {}]}]
      [<compound $ $> [string (list term)]
@@ -23,8 +22,7 @@
      [<unify ,$t $> something
       {[$s (unify t s)]}]
      [$ something
-      {[$tgt {tgt}]}]
-      }))
+      {[$tgt {tgt}]}]}))
 
 (define $app
   (cambda $xs
@@ -43,7 +41,6 @@
 ; P(g(x), y)
 (define $t1 (app "P" (app "g" (var x)) (var y)))
 ; P(g(g(c)), c)
-; what is "c"?
 (define $t2 (app "P" (app "g" (app "g" (app "c"))) (app "c")))
 
 (define $occur
@@ -74,13 +71,14 @@
   {})
 
 (define $subst
-  (match-lambda [something term]
-    {[[$u <var $n>]
-      (match u (multiset [integer term])
-        {[<cons [,n $t] _> t] ; subst規則があればsubst
-         [_ <Var n>]})]       ; なければそのまま
-     [[$u <compound $f $xs>]
-      <Compound f (map (lambda $x (subst u x)) xs)>]}))
+  (lambda [$u $t]
+    (match t term
+      {[<var $n>
+         (match u (multiset [integer term])
+           {[<cons [,n $t] _> t] ; subst規則があればsubst
+            [_ <Var n>]})]       ; なければそのまま
+       [<compound $f $xs>
+         <Compound f (map (lambda $x (subst u x)) xs)>]})))
 
 ; [z / x, x / y] P(g(x), y) = P(g(z), x)
 (assert-equal "subst1"
@@ -92,25 +90,24 @@
   (subst {[z <Var z>]} t1)
   <Compound "P" {<Compound "g" {<Var 0>}> <Var 1>}>)
 
+; 失敗なら{}、成功なら{単一化子}を返す(optionalの気持ち)
 (define $unify
   (match-lambda (unordered-pair term)
-    {
-     [<pair <var $n> <var ,n>>
-      {{}}] ; success
-     [<pair <var $n> (& $t !(occur ,n))>
-      {{[n t]}}]
+    {[<pair <var $x> <var ,x>>
+      {{}}] ; 成功(空の代入を返す)
+     [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
+      {{[x t]}}] ; 代入[t/x]を返す
      [<pair <compound $f <nil>> <compound ,f <nil>>>
-      {{}}] ; success
+      {{}}] ; 成功
      [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
       (match (unify x y) (list something)
-        {[,{} {}] ; failure
-         [<cons $u1 _> ; unifiableな場合、制約はsingletonになっている
-          (match (unify (subst u1 <Compound f xs>) (subst u1 <Compound f ys>)) (list something)
-               {[,{} {}] ; failure
-                [<cons $u2 _> {{@u1 @u2}}]} ; 
-          )]})]
-     [_ {}] ; failure
-    }))
+       {[,{} {}] ; unifyがすでに失敗している
+        [<cons $u1 _> ; unifiableな場合、単一化子をsingletonから取り出す
+         (match (unify (subst u1 <Compound f xs>) (subst u1 <Compound f ys>))
+                (list something)
+          {[,{} {}] ; 失敗
+           [<cons $u2 _> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
+     [_ {}]}))
 
 ; t1 = P(g(x), y)
 ; t2 = P(g(g(c)), c)
@@ -155,13 +152,60 @@
 
 (define $solve
   (match-lambda (multiset (multiset literal))
-    {[<cons <nil> _>
+    {[<cons <nil> _> ; 空節が導出できた
       <REFUTE>]
      [$p
       (let {[$q (resolution (rename-problem 0 p))]}
         (if (include?/m (multiset literal) p q) ; q \subseteq? p
           <SATURATED>
-          (solve {@p @q})))]}))
+          (solve (debug-c {@p @q}))))]}))
+
+(define $append-strings
+  (lambda [$strs]
+    (foldl (lambda [$acc $x] (append-string acc x)) "" strs)))
+
+(define $concat-strings
+  (lambda [$strs $pad]
+    (append-strings
+      (match-all strs (list string)
+        {[<nil> ""]
+         [<join _ <cons $x !<nil>>> (append-string x pad)]
+         [<join _ <cons $x <nil>>> x]
+         }))))
+
+(define $show-term
+  (match-lambda term
+    {[<var ,0> "x"]
+     [<var ,1> "y"]
+     [<var ,2> "z"]
+     [<var ,3> "w"]
+     [<var $x> (show x)]
+     [<compound $f ,{}> f]
+     [<compound ,"=" <cons $x <cons $y _>>>
+       (append-string (show-term x) (append-string " = " (show-term y)))]
+     [<compound $f $xs>
+       (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
+    }))
+
+(define $show-lit
+  (match-lambda literal
+    {[<lit ,1  $t> (show-term t)]
+     [<lit ,-1 $t> (append-string "~" (show-term t))]}))
+
+(define $show-clause
+  (lambda [$cls]
+    (let {[$x (concat-strings (map show-lit cls) ", ")]}
+      (append-string "{" (append-string x "}")))))
+
+(define $show-clauses
+  (lambda [$clss]
+    (let {[$x (concat-strings (map show-clause clss) "\n")]}
+      (append-string "{" (append-string x "}")))))
+
+(define $debug-c
+  (macro [$expr]
+    (io (do {[(print (show-clauses expr))]}
+          (return expr)))))
 
 (define $t3 (app "P" (var x) (app "f" (var x) (var y))))
 (define $t4 (app "P" (app "c") (var y)))

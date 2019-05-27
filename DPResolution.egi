@@ -150,6 +150,17 @@
         (cons (subst-clause u c)
               (rename-problem (+ n (length u)) cs)))]}))
 
+(define $trivial?
+  (lambda [$cls]
+    (any id
+      (match-all cls (multiset literal)
+        {[<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>> #t]
+         [_ #f]}))))
+
+(define $filter-clause
+  (lambda [$clss]
+    (filter (lambda [$cls] (not (trivial? cls))) clss)))
+
 (define $solve
   (match-lambda (multiset (multiset literal))
     {[<cons <nil> _> ; 空節が導出できた
@@ -158,7 +169,8 @@
       (let {[$q (resolution (rename-problem 0 p))]}
         (if (include?/m (multiset literal) p q) ; q \subseteq? p
           <SATURATED>
-          (solve (debug-c {@p @q}))))]}))
+          (let {[$r {@p @q}]}
+            (solve (debug-c r)))))]}))
 
 (define $append-strings
   (lambda [$strs]

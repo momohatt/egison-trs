@@ -161,6 +161,10 @@
   (lambda [$clss]
     (filter (lambda [$cls] (not (trivial? cls))) clss)))
 
+(define $unique
+  (match-all-lambda (list (multiset eq))
+    [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
+
 (define $solve
   (match-lambda (multiset (multiset literal))
     {[<cons <nil> _> ; 空節が導出できた
@@ -169,7 +173,7 @@
       (let {[$q (resolution (rename-problem 0 p))]}
         (if (include?/m (multiset literal) p q) ; q \subseteq? p
           <SATURATED>
-          (let {[$r {@p @q}]}
+          (let {[$r (unique {@p @q})]}
             (solve (debug-c r)))))]}))
 
 (define $append-strings
@@ -211,7 +215,7 @@
 
 (define $show-clauses
   (lambda [$clss]
-    (let {[$x (concat-strings (map show-clause clss) "\n")]}
+    (let {[$x (concat-strings (map show-clause clss) "\n ")]}
       (append-string "{" (append-string x "}")))))
 
 (define $debug-c

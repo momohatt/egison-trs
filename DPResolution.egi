@@ -9,8 +9,6 @@
 (define $positive?
   (lambda $x (gt? x 0)))
 
-;(define $term (algebraic-data-matcher {<var integer> <compound string (list term)>}))
-
 (define $term
   (matcher
     {[<var $> integer
@@ -123,8 +121,9 @@
     {<lit integer term>}))
 
 (define $fv-clause
-  (match-all-lambda (multiset literal)
-    {[<cons <lit _ (occur $v)> _> v]}))
+  (lambda [$x]
+    (unique (match-all x (multiset literal)
+      [<cons <lit _ (occur $v)> _> v]))))
 
 (define $subst-clause
   (match-all-lambda [something (multiset literal)]
@@ -162,6 +161,10 @@
     (filter (lambda [$cls] (not (trivial? cls))) clss)))
 
 (define $unique
+  (match-all-lambda (list eq)
+    [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
+
+(define $unique-clause
   (match-all-lambda (list (multiset eq))
     [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
 
@@ -173,8 +176,10 @@
       (let {[$q (resolution (rename-problem 0 p))]}
         (if (include?/m (multiset literal) p q) ; q \subseteq? p
           <SATURATED>
-          (let {[$r (unique {@p @q})]}
+          (let {[$r (unique-clause {@p @q})]}
             (solve (debug-c r)))))]}))
+
+; =============== pretty printing ===============
 
 (define $append-strings
   (lambda [$strs]
@@ -222,6 +227,8 @@
   (macro [$expr]
     (io (do {[(print (show-clauses expr))]}
           (return expr)))))
+
+; ============= example (group theory) ================
 
 (define $t3 (app "P" (var x) (app "f" (var x) (var y))))
 (define $t4 (app "P" (app "c") (var y)))
@@ -302,8 +309,7 @@
    @axioms-of-equality
 
    ; (negation of) the goal: e * x = x
-   {<Lit -1 (eql (p e e1) e1)>}
-  })
+   {<Lit -1 (eql (p e e1) e1)>}})
 
 (assert-equal "solve3" (solve p3) <REFUTE>)
 
@@ -313,7 +319,6 @@
    @axioms-of-equality
 
    ; (negation of) the goal: x^-1 * x = e
-   {<Lit -1 (eql (p (i e2) e2) e)>}
-  })
+   {<Lit -1 (eql (p (i e2) e2) e)>}})
 
 (assert-equal "solve4" (solve p4) <REFUTE>)

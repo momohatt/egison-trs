@@ -14,11 +14,11 @@
     (foldl (lambda [$acc $x] (append-string acc x)) "" strs)))
 
 (define $concat-strings
-  (lambda [$strs $pad]
+  (lambda [$strs $sep]
     (append-strings
       (match-all strs (list string)
         {[<nil> ""]
-         [<join _ <cons $x !<nil>>> (append-string x pad)]
+         [<join _ <cons $x !<nil>>> (append-string x sep)]
          [<join _ <cons $x <nil>>> x]
          }))))
 
@@ -31,7 +31,7 @@
      [<var $x> (show x)]
      [<compound $f ,{}> f]
      [<compound ,"=" <cons $x <cons $y _>>>
-       (append-string (show-term x) (append-string " = " (show-term y)))]
+       (append-strings {(show-term x) " = " (show-term y)})]
      [<compound $f $xs>
        (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
     }))
@@ -44,12 +44,12 @@
 (define $show-clause
   (lambda [$cls]
     (let {[$x (concat-strings (map show-lit cls) ", ")]}
-      (append-string "{" (append-string x "}")))))
+      (append-strings {"{" x "}"}))))
 
 (define $show-clauses
   (lambda [$clss]
     (let {[$x (concat-strings (map show-clause clss) "\n ")]}
-      (append-string "{" (append-string x "}")))))
+      (append-strings {"{" x "}"}))))
 
 (define $debug-c
   (macro [$expr]

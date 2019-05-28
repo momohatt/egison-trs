@@ -1,0 +1,57 @@
+(define $unordered-pair
+ (lambda [$m]
+  (matcher
+    {[<pair $ $> [m m] {[[$x $y] {[x y] [y x]}]}]
+     [$ [something] {[$tgt {tgt}]}]})))
+
+(define $positive?
+  (lambda $x (gt? x 0)))
+
+; ============================== pretty printing ===============================
+
+(define $append-strings
+  (lambda [$strs]
+    (foldl (lambda [$acc $x] (append-string acc x)) "" strs)))
+
+(define $concat-strings
+  (lambda [$strs $pad]
+    (append-strings
+      (match-all strs (list string)
+        {[<nil> ""]
+         [<join _ <cons $x !<nil>>> (append-string x pad)]
+         [<join _ <cons $x <nil>>> x]
+         }))))
+
+(define $show-term
+  (match-lambda term
+    {[<var ,0> "x"]
+     [<var ,1> "y"]
+     [<var ,2> "z"]
+     [<var ,3> "w"]
+     [<var $x> (show x)]
+     [<compound $f ,{}> f]
+     [<compound ,"=" <cons $x <cons $y _>>>
+       (append-string (show-term x) (append-string " = " (show-term y)))]
+     [<compound $f $xs>
+       (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
+    }))
+
+(define $show-lit
+  (match-lambda literal
+    {[<lit ,1  $t> (show-term t)]
+     [<lit ,-1 $t> (append-string "~" (show-term t))]}))
+
+(define $show-clause
+  (lambda [$cls]
+    (let {[$x (concat-strings (map show-lit cls) ", ")]}
+      (append-string "{" (append-string x "}")))))
+
+(define $show-clauses
+  (lambda [$clss]
+    (let {[$x (concat-strings (map show-clause clss) "\n ")]}
+      (append-string "{" (append-string x "}")))))
+
+(define $debug-c
+  (macro [$expr]
+    (io (do {[(print (show-clauses expr))]}
+          (return expr)))))

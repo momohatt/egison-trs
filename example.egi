@@ -1,0 +1,185 @@
+(load-file "resolution.egi")
+
+(define $x 0)
+(define $y 1)
+(define $z 2)
+(define $w 3)
+; P(g(x), y)
+(define $t1 (app "P" (app "g" (var x)) (var y)))
+; P(g(g(c)), c)
+(define $t2 (app "P" (app "g" (app "g" (app "c"))) (app "c")))
+
+(define $test-occur
+  (lambda [$v $t]
+    (match t term
+      {[(occur ,v) #t]
+       [_ #f]})))
+
+(assert "occur1" (test-occur x t1))
+(assert "occur2" (not (test-occur z t1)))
+
+(assert "fv1"
+  (match (fv t1) (multiset something)
+   {[,{0 1} #t]
+    [_ #f]}))
+
+(assert-equal "fv2"
+  (fv t2)
+  {})
+
+; [z / x, x / y] P(g(x), y) = P(g(z), x)
+(assert-equal "subst1"
+  (subst {[y <Var x>] [x <Var z>]} t1)
+  <Compound "P" {<Compound "g" {<Var 2>}> <Var 0>}>)
+
+; [z / z] P(g(x), y) = P(g(x), y)
+(assert-equal "subst2"
+  (subst {[z <Var z>]} t1)
+  <Compound "P" {<Compound "g" {<Var 0>}> <Var 1>}>)
+
+; t1 = P(g(x), y)
+; t2 = P(g(g(c)), c)
+(assert-equal "unify1" (unify (var x) (var x)) {{}})
+(assert-equal "unify2" (unify t1 (var z)) {{[z t1]}})
+; {[x, g(c)], [y, c]}
+(assert-equal "unify3" (unify t1 t2) {{[0 <Compound "g" {<Compound "c" {}>}>] [1 <Compound "c" {}>]}})
+(assert-equal "unify4" (unify (var x) t1) {})
+
+; ========================= example (group theory) =============================
+
+(define $t3 (app "P" (var x) (app "f" (var x) (var y))))
+(define $t4 (app "P" (app "c") (var y)))
+
+; 1. Problem:
+; (\forall x y. \exists z. P(g(x),y) \to P(x,z))
+; \land (\forall y. \lnot P(c,y)) \land P(g(g(c)),c)
+; 2. Prenex normal form
+; \forall x y. \exists z. (P(g(x),y) \to P(x,z))
+; \land \lnot P(c,y) \land P(g(g(c)),c)
+; 3. Skolemization
+; \forall x y. (P(g(x),y) \to P(x,f(x,y))) \land \lnot P(c,y) \land P(g(g(c)),c)
+; 4. Conjunction normal form
+; (\lnot P(g(x),y) \lor P(x,f(x,y))) \land \lnot P(c,y) \land P(g(g(c)),c)
+(define $p1 {{<Lit -1 t1> <Lit 1 t3>} {<Lit -1 t4>} {<Lit 1 t2>}})
+
+(assert-equal "solve1"
+  (solve p1)
+  <REFUTE>)
+
+; Drinker's paradox
+; 1. \lnot \exists x. D(x) \to \forall y. D(y)
+; 2. \forall x. \exists y. D(x) \land \lnot D(y)
+; 3. \forall x. D(x) \land \lnot D(c)
+; 4. D(x) \land \lnot D(c)
+(define $p2
+  {{<Lit 1 (app "D" (var x))>} {<Lit -1 (app "D" (app "c"))>}})
+
+(assert-equal "solve2"
+  (solve p2)
+  <REFUTE>)
+
+; Recall the axioms of groups:
+; (1) (x*y)*z = x*(y*z)
+; (2) x*(x^-1)= 1
+; (3) (x^-1)*x = 1
+; (4) x*1 = x
+; (5) 1*x = x
+; It is known that (3) and (5) above are redundant, i.e., provable from other axioms. Let's prove this!
+
+(define $eql (lambda [$x $y] (app "=" x y)))
+(define $p (lambda [$x $y] (app "p" x y))) ; product
+(define $i (lambda $x (app "i" x)))        ; inverse
+(define $e (app "e"))
+(define $e1 (app "e1"))
+(define $e2 (app "e2"))
+
+; (a) axioms of groups
+; - p(p(x,y),z) = p(x,p(y,z))
+; - p(x,i(x)) = e
+; - p(x,e) = x
+; (b) axioms of equality
+; - x = x
+; - \lnot (x = y) \lor (y = x)
+; - \lnot (x = y) \lor lnot (y = z) \lor (x = z)
+; - \lnot (x = y) \lnot (z = w) \lor (p(x,z) = p(y,w))
+; - \lnot (x = y) \lor (i(x) = i(y))
+; (c) (negation) of the goal
+; - \lnot (p(i(e1),e1) = e) \lor \lnot (p(e,e2) = e2)
+
+(define $axioms-of-groups
+  {{<Lit 1 (eql (p (p (var x) (var y)) (var z)) (p (var x) (p (var y) (var z))))>}
+   {<Lit 1 (eql (p (var x) (i (var x))) e)>}
+   {<Lit 1 (eql (p (var x) e) (var x))>}
+  })
+
+(define $axioms-of-equality
+  {{<Lit 1 (eql (var x) (var x))>}
+   {<Lit -1 (eql (var x) (var y))> <Lit 1 (eql (var y) (var x))>}
+   {<Lit -1 (eql (var x) (var y))> <Lit -1 (eql (var y) (var z))> <Lit 1 (eql (var x) (var z))>}
+   {<Lit -1 (eql (var x) (var y))> <Lit -1 (eql (var z) (var w))> <Lit 1 (eql (p (var x) (var z)) (p (var y) (var w)))>}
+   {<Lit -1 (eql (var x) (var y))> <Lit 1 (eql (i (var x)) (i (var y)))>}
+  })
+
+; (1) (2) (4) |= (5)
+(define $p3
+  {@axioms-of-groups
+   @axioms-of-equality
+
+   ; (negation of) the goal: e * x = x
+   {<Lit -1 (eql (p e e1) e1)>}})
+
+(assert-equal "solve3" (solve p3) <REFUTE>)
+
+; (1) (2) (4) |= (3)
+(define $p4
+  {@axioms-of-groups
+   @axioms-of-equality
+
+   ; (negation of) the goal: x^-1 * x = e
+   {<Lit -1 (eql (p (i e2) e2) e)>}})
+
+(assert-equal "solve4" (solve p4) <REFUTE>)
+
+; ==============================================================================
+
+(define $p5
+  ; Issac is a boy
+  {{<Lit 1 (app "B" (app "i"))>}
+   ; Kate is a girl
+   {<Lit 1 (app "G" (app "k"))>}
+   ; Joe's friends are all tall
+   {<Lit -1 (app "F" (app "j") (var x))> <Lit 1 (app "T" (var x))>}
+   ; Harry loves any girl that is tall
+   {<Lit -1 (app "G" (var y))> <Lit -1 (app "T" (var y))> <Lit 1 (app "L" (app "h") (var y))>}
+   ; Issac is a friend of Joe
+   {<Lit 1 (app "F" (app "j") (app "i"))>}
+   ; Kate is a friend of Joe
+   {<Lit 1 (app "F" (app "j") (app "k"))>}
+
+   ; question: does Harry love any of Joe's friends? If he does, who does he love?
+   {<Lit -1 (app "L" (app "h") (var z))> <Lit -1 (app "F" (app "j") (var z))>}
+  })
+
+(assert-equal "solve5"
+  (solve problem)
+  <REFUTE>)
+
+(define $p6
+  {{<Lit 1 (app "girl" (app "c"))>}
+   {<Lit -1 (app "boy" (var x))> <Lit 1 (app "like" (var x) (app "c"))>}
+   {<Lit 1 (app "boy" (app "d"))>}
+   {<Lit -1 (app "girl" (var y))> <Lit -1 (app "lile" (app "d") (var y))>}
+  })
+
+(define $p7
+  ; Kate is a girl
+  {{<Lit 1 (app "G" (app "k"))>}
+   ; Joe's friends are all tall
+   {<Lit -1 (app "F" (app "j") (var x))> <Lit 1 (app "T" (var x))>}
+   ; Harry loves any girl that is tall
+   {<Lit -1 (app "G" (var y))> <Lit -1 (app "T" (var y))> <Lit 1 (app "L" (app "h") (var y))>}
+   ; Kate is a friend of Joe
+   {<Lit 1 (app "F" (app "j") (app "k"))>}
+
+   ; question: does Harry love any of Joe's friends? If he does, who does he love?
+   {<Lit -1 (app "L" (app "h") (var z))> <Lit -1 (app "F" (app "j") (var z))>}})

@@ -1,0 +1,128 @@
+; Implementation of resolution principle for first-order logic in Egison
+
+(load-file "utils.egi")
+
+(define $term
+  (matcher
+    {[<var $> integer
+      {[<Var $i> {i}]
+       [_ {}]}]
+     [<compound $ $> [string (list term)]
+      {[<Compound $s $l> {[s l]}]
+       [_ {}]}]
+     [<unify ,$t $> something
+      {[$s (unify t s)]}]
+     [$ something
+      {[$tgt {tgt}]}]}))
+
+(define $app
+  (cambda $xs
+    (match xs (list something)
+      {[<cons $x $xs>
+        <Compound x xs>]})))
+
+(define $var
+  (lambda $n
+    <Var n>))
+
+(define $occur
+  (pattern-function [$v]
+    (| <var v>
+       <compound _ <join _ <cons (occur v) _>>>)))
+
+(define $fv
+  (match-all-lambda term
+    {[(occur $v) v]}))
+
+(define $subst
+  (lambda [$u $t]
+    (match t term
+      {[<var $n>
+         (match u (multiset [integer term])
+           {[<cons [,n $t] _> t] ; subst規則があればsubst
+            [_ <Var n>]})]       ; なければそのまま
+       [<compound $f $xs>
+         <Compound f (map (lambda $x (subst u x)) xs)>]})))
+
+; 失敗なら{}、成功なら{単一化子}を返す(optionalの気持ち)
+(define $unify
+  (match-lambda (unordered-pair term)
+    {[<pair <var $x> <var ,x>>
+      {{}}] ; 成功(空の代入を返す)
+     [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
+      {{[x t]}}] ; 代入[t/x]を返す
+     [<pair <compound $f <nil>> <compound ,f <nil>>>
+      {{}}] ; 成功
+     [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
+      (match (unify x y) (list something)
+       {[,{} {}] ; unifyがすでに失敗している
+        [<cons $u1 _> ; unifiableな場合、単一化子をsingletonから取り出す
+         (match (unify (subst u1 <Compound f xs>) (subst u1 <Compound f ys>))
+                (list something)
+          {[,{} {}] ; 失敗
+           [<cons $u2 _> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
+     [_ {}]}))
+
+(define $literal
+  (algebraic-data-matcher
+    ; intergerは1ならそのまま、-1ならnegateされる
+    {<lit integer term>}))
+
+(define $fv-clause
+  (lambda [$x]
+    (unique (match-all x (multiset literal)
+      [<cons <lit _ (occur $v)> _> v]))))
+
+(define $subst-clause
+  (match-all-lambda [something (multiset literal)]
+    {[[$u <cons <lit $p $t> _>]
+      <Lit p (subst u t)>]}))
+
+(define $resolution
+  (match-all-lambda (multiset (multiset literal))
+    {[<cons <cons <lit ,1 $t> $xs>
+       <cons <cons <lit ,-1 (& <unify ,t $σ> $s)> $ys>
+         _>>
+      {@(subst-clause σ xs) @(subst-clause σ ys)}]}))
+
+; 束縛変数の名前が各節で異なるようにする
+(define $rename-problem
+  (match-lambda [integer (list (list literal))]
+    {[[$n <nil>]
+      {}]
+     [[$n <cons $c $cs>]
+      (let {[$u (zip (fv-clause c)
+                     ; n, n+1, ... の新しいvarを生成
+                     (map (lambda $x <Var x>) (from n)))]}
+        (cons (subst-clause u c)
+              (rename-problem (+ n (length u)) cs)))]}))
+
+(define $trivial?
+  (lambda [$cls]
+    (any id
+      (match-all cls (multiset literal)
+        {[<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>> #t]
+         [_ #f]}))))
+
+(define $filter-clause
+  (lambda [$clss]
+    (filter (lambda [$cls] (not (trivial? cls))) clss)))
+
+(define $unique
+  (match-all-lambda (list eq)
+    [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
+
+(define $unique-clause
+  (match-all-lambda (list (multiset eq))
+    [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
+
+(define $solve
+  (match-lambda (multiset (multiset literal))
+    {[<cons <nil> _> ; 空節が導出できた
+      <REFUTE>]
+     [$p
+      (let {[$q (resolution (rename-problem 0 p))]}
+        (if (include?/m (multiset literal) p q) ; q \subseteq? p
+          <SATURATED>
+          (let {[$r (unique-clause {@p @q})]}
+            (solve (debug-c r)))))]}))

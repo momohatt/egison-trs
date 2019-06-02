@@ -1,0 +1,490 @@
+\documentclass[dvipdfmx,11pt,notheorems]{beamer}
+%%%% 和文用 %%%%%
+\usepackage{bxdpx-beamer}
+\usepackage{pxjahyper}
+\usepackage{minijs}%和文用
+\usepackage{stmaryrd}
+\usepackage{wrapfig}
+\usepackage{txfonts}
+\usepackage{minted}
+\usepackage{ascmac}
+\usepackage{bussproofs}
+\setminted{
+    breaklines,
+    mathescape=true,
+    fontsize=\footnotesize,
+}
+\renewcommand{\kanjifamilydefault}{\gtdefault}%和文用
+
+%%%% スライドの見た目 %%%%%
+\usetheme{Madrid}
+\usefonttheme{professionalfonts}
+\setbeamertemplate{frametitle}[default][center]
+\setbeamertemplate{navigation symbols}{}
+\setbeamercovered{transparent}%好みに応じてどうぞ）
+\setbeamertemplate{footline}[page number]
+\setbeamerfont{footline}{size=\normalsize,series=\bfseries}
+\setbeamercolor{footline}{fg=black,bg=black}
+%%%%
+
+%%%% 定義環境 %%%%%
+\usepackage{amsmath,amssymb}
+\usepackage{amsthm}
+\theoremstyle{definition}
+\newtheorem{theorem}{定理}
+\newtheorem{definition}{定義}
+\newtheorem{proposition}{命題}
+\newtheorem{lemma}{補題}
+\newtheorem{corollary}{系}
+\newtheorem{conjecture}{予想}
+\newtheorem*{remark}{Remark}
+\renewcommand{\proofname}{}
+%%%%%%%%%
+
+%%%%% フォント基本設定 %%%%%
+\usepackage[T1]{fontenc}%8bit フォント
+\usepackage{textcomp}%欧文フォントの追加
+\usepackage[utf8]{inputenc}%文字コードをUTF-8
+\usepackage{otf}%otfパッケージ
+\usepackage{bm}%数式太字
+%%%%%%%%%%
+
+\newcommand{\code}[1]{\mintinline{text}{#1}}
+\newcommand{\red}[1]{{\color{red} #1}}
+
+\title[Egison]{Egisonを用いた自動定理証明}%[略タイトル]{タイトル}
+\author[]{05-181023 服部桃子}%[略名前]{名前}
+% \institute[JPN]{Tokyo, Japan}%[略所属]{所属}
+\date{\today}%日付
+\begin{document}
+
+\begin{frame}[plain]\frametitle{}
+\titlepage %表紙
+\end{frame}
+
+\begin{frame}\frametitle{Contents}
+\tableofcontents %目次
+\end{frame}
+
+\section{Egisonについて}
+\begin{frame}\frametitle{Contents}
+\tableofcontents[currentsection]
+\end{frame}
+
+\begin{frame}[fragile]{1. Egison入門}
+  特長
+  \begin{itemize}
+    \item 「パターンマッチ指向」言語
+    \item Non-freeなデータ型に対してパターンマッチできる
+    \item 非線形パターンマッチができる
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{1. Egison入門}
+  \begin{block}{Non-freeなデータ型}
+    標準形がないデータ型のこと
+    \begin{itemize}
+      \item set, multisetはNon-free
+      \begin{itemize}
+        \item multiset$\{1, 2, 3\}$は$\{2, 1, 3\}$などとも書ける
+      \end{itemize}
+      \item listはconsに関してはfree
+      \begin{itemize}
+        \item \code{[1; 2]} = \code{1 :: 2 :: []} \hspace{10pt} {\scriptsize (※OCaml)}
+      \end{itemize}
+      \item listはappendに関してはNon-free
+      \begin{itemize}
+        \item \code{[1; 2]} = \code{[] @ [1; 2]} = \code{[1] @ [2]} = \code{[1; 2] @ []}  \hspace{10pt} {\scriptsize (※OCaml)}
+      \end{itemize}
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{1. Egison入門}
+  \begin{exampleblock}{例}
+    \begin{minted}{racket}
+(match-all {1 2 3} (list integer) [<cons $x $xs> [x xs]])
+;=>{[1 {2 3}]}
+
+(match-all {1 2} (list integer) [<join $xs $ys> [xs ys]])
+;=>{[{} {1 2}] [{1} {2}] [{1 2} {}]}
+
+(match-all {1 2 3} (multiset integer) [<cons $x $xs> [x xs]])
+;=>{[1 {2 3}] [2 {1 3}] [3 {1 2}]}
+
+(match-all {1 2} (multiset integer) [<join $xs $ys> [xs ys]])
+;=>{[{} {1 2}] [{1} {2}] [{2} {1}] [{1 2} {}]}
+
+(match-all {1 2 3} (set integer) [<cons $x $xs> [x xs]])
+;=>{[1 {1 2 3}] [2 {1 2 3}] [3 {1 2 3}]}
+
+(match-all {1 2} (set integer) [<join $xs $ys> [xs ys]])
+;=>{[{} {1 2}] [{1} {1 2}] [{2} {1 2}] [{1 2} {1 2}]}
+    \end{minted}
+※\code{{...}}はcollection、\code{[...]}はtuple
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}[fragile]{1. Egison入門}
+  \begin{block}{非線形パターンマッチ}
+    \begin{itemize}
+      \item パターン中に同じ変数が複数回出現することを許す
+      \item 例
+      \begin{minted}[escapeinside=||]{text}
+(define $twin-primes
+  (match-all primes (list integer)
+    [<join _ <cons $p <cons ,(+ p 2) _>>> [p (+ p 2)]]))
+      \end{minted}
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{1. Egison入門}
+  \begin{block}{matcherの定義}
+    \begin{minted}{racket}
+(define $unordered-pair
+  (lambda [$m] ; 引数もmatcher
+    (matcher
+      {[<pair $ $> [m m] ; マッチの形式とmatcher
+         {[<P $x $y> {[x y] [y x]}]}] ; next-targetsを返す
+       [$ [something] ; 分解せずに返す場合
+         {[$tgt {tgt}]}]})))
+
+(match-all <P 1 2> (unordered-pair integer) [<pair $x $y> [x y]])
+;=> {[1 2] [2 1]}
+(match-all <P 2 1> (unordered-pair integer) [$x x])
+;=> {<Pair 2 1>}
+    \end{minted}
+  \end{block}
+\end{frame}
+
+\section{導出原理(復習)}
+\begin{frame}\frametitle{Contents}
+\tableofcontents[currentsection]
+\end{frame}
+
+\begin{frame}{2-1. 導出原理(命題論理)}
+  \begin{block}{定義: Resolvent}
+    \begin{itemize}
+      \item リテラル ... 命題変数$P$またはその否定$\lnot P$
+      \item 節(clause) ... リテラルの有限集合
+      \item リテラル$L$のcomplement $L^*$を以下で定義
+      \vspace{-10pt}
+      \[
+      L^* :\equiv \left\{\begin{array}{ll}
+      \lnot P & (L \equiv P) \\
+      P       & (L \equiv \lnot P) \\
+      \end{array}\right.
+      \]
+      \item 節$c, c_1, c_2$に対し以下を満たす$L$が存在する時、$c$を$c_1, c_2$の{\bf resolvent}という
+      \begin{itemize}
+        \item $L \in c_1$ かつ $L^* \in c_2$
+        \item $c = \left(c_1 \setminus \{L\}\right) \cup \left(c_2 \setminus \{L^*\}\right)$
+      \end{itemize}
+    \end{itemize}
+  \end{block}
+
+  \begin{exampleblock}{例}
+    \begin{center}
+      \bottomAlignProof
+      \AxiomC{$\{\red{P}, \lnot Q, \lnot R\}$}
+      \AxiomC{$\{\red{\lnot P}, \lnot Q, R, S\}$}
+      \BinaryInfC{$\{\lnot Q, \lnot R, R, S\}$}
+      \DisplayProof
+      \qquad
+      \bottomAlignProof
+      \AxiomC{$\{P, \lnot Q, \red{\lnot R}\}$}
+      \AxiomC{$\{\lnot P, \lnot Q, \red{R}, S\}$}
+      \BinaryInfC{$\{P, \lnot P, \lnot Q, S\}$}
+      \DisplayProof
+    \end{center}
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{2-1. 導出原理(命題論理)}
+  \begin{block}{}
+    $S = \{c_1, \ldots, c_n\}$を節の有限集合としたとき、
+    \[
+    c(S) := \left(\bigvee c_1\right) \land \cdots \land \left(\bigvee c_n\right)
+    \]
+  \end{block}
+  \begin{block}{健全性・完全性}
+    \vspace{-10pt}
+    \[
+    c(S) \Rightarrow \text{がLKで導出可能} \quad \red{\Leftrightarrow} \quad S \text{のresolution treeで根が$\emptyset$のものが存在}
+    \]
+  \end{block}
+\end{frame}
+
+\begin{frame}{2-2. 導出原理(述語論理)}
+  \begin{block}{命題論理との違い}
+    \begin{itemize}
+      \item リテラルは命題変数ではなく原子式$P(t_1, \ldots, t_n)$になる
+      \item resolventの定義: 節$c, c_1, c_2$に対し以下を満たす$L_1, L_2$が存在するとき、$c$を$c_1, c_2$のresolventという
+      \begin{itemize}
+        \item $L_1 \in c_1$かつ$L_2^* \in c_2$
+        \item $L_1, L_2$の\red{最汎単一化子$\theta$}が存在し、$c = (c_1\theta \setminus \{L_1 \theta\}) \cup (c_2\theta \setminus \{L_2^* \theta\})$
+      \end{itemize}
+    \end{itemize}
+  \end{block}
+
+  \begin{exampleblock}{例}
+    \begin{prooftree}
+      \AxiomC{$\{\red{P(a, b)}\}$}
+      \AxiomC{$\{\red{\lnot P(a, x)}, Q(x)\}$}
+      \RightLabel{{\footnotesize $\theta = [b / x]$}}
+      \BinaryInfC{$\{Q(b)\}$}
+    \end{prooftree}
+  \end{exampleblock}
+\end{frame}
+
+\section{Egisonでの実装}
+\begin{frame}\frametitle{Contents}
+\tableofcontents[currentsection]
+\end{frame}
+
+\begin{frame}[fragile]{3. Egisonでの実装}
+  \begin{block}{termの定義}
+    \begin{screen}
+      \[
+      t ::= x \in {\bf Var} \mid f(t_1, \ldots, t_n)
+      \]
+    \end{screen}
+  \begin{minted}{racket}
+(define $term
+  (matcher
+    {[<var $> integer ; variableの場合 (variableはintegerで定義)
+      {[<Var $i> {i}]
+       [_ {}]}]
+     [<compound $ $> [string (list term)] ; 関数に適用されている場合
+      {[<Compound $s $l> {[s l]}]
+       [_ {}]}]
+     [<unify ,$t $> something ; resolutionの時に使う
+      {[$s (unify t s)]}]
+     [$ something
+      {[$tgt {tgt}]}]}))
+  \end{minted}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{3. Egisonでの実装}
+  \begin{block}{}
+    \begin{minted}{racket}
+(define $subst
+  (lambda [$u $t] ; tに代入uを適用　
+    (match t term
+      {[<var $n>
+         (match u (multiset [integer term])
+           {[<cons [,n $t] _> t] ; あてはまる規則があれば代入
+            [_ <Var n>]})]       ; なければそのまま
+       [<compound $f $xs> ; tが関数適用された項の場合、関数の全引数に代入
+         <Compound f (map (lambda $x (subst u x)) xs)>]})))
+    \end{minted}
+  \end{block}
+
+  \begin{exampleblock}{}
+    \begin{minted}{racket}
+(define $x 0)
+(define $y 1)
+(define $z 2)
+; P(g(x), y)
+(define $t1 (app "P" (app "g" (var x)) (var y)))
+
+; [x/y][z/x] P(g(x), y) = P(g(z), x)
+(subst {[y <Var x>] [x <Var z>]} t1)
+;=> <Compound "P" {<Compound "g" {<Var 2>}> <Var 0>}>
+    \end{minted}
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}[fragile]{3. Egisonでの実装}
+  \begin{block}{unify}
+    \begin{minted}[fontsize=\scriptsize]{racket}
+; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
+(define $unify
+  (match-lambda (unordered-pair term)
+    {[<pair <var $x> <var ,x>>
+      {{}}] ; 成功(空の単一化子を返す)
+     [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
+      {{[x t]}}] ; [t/x]を返す
+     [<pair <compound $f <nil>> <compound ,f <nil>>>
+      {{}}] ; 成功
+     [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
+      (match (unify x y) (list something)
+       {[,{} {}] ; unifyがすでに失敗している
+        [<cons $u1 _> ; unifiableな場合、単一化子をsingletonから取り出す
+         (match (unify (subst u1 <Compound f xs>) (subst u1 <Compound f ys>))
+                (list something)
+          {[,{} {}] ; 失敗
+           [<cons $u2 _> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
+     [_ {}]})) ; 失敗
+    \end{minted}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{3. Egisonでの実装}
+  \begin{block}{resolution}
+    \begin{minted}{racket}
+(define $resolution ; resolventを求める
+  (match-all-lambda (multiset (multiset literal))
+     ; リテラル$t$
+    {[<cons <cons <lit ,1 $t> $xs>
+       ; $t$との最汎単一化子が$\sigma$であるようなリテラル$\lnot s$
+       <cons <cons <lit ,-1 (& <unify ,t $σ> $s)> $ys>
+         ; 残りの節は無視
+         _>>
+      {@(subst-clause σ xs) @(subst-clause σ ys)}]}))
+    \end{minted}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{3. Egisonでの実装}
+  \begin{block}{solve}
+    \begin{minted}{racket}
+(define $solve
+  (match-lambda (multiset (multiset literal))
+    {[<cons <nil> _> ; 空節が導出できた
+      <REFUTE>]
+     [$p
+      (let {[$q (resolution (rename-problem 0 p))]}
+        (if (include?/m (multiset literal) p q) ; q $\overset{?}{\subseteq}$ p
+          <SATURATED> ; 新しい節がない→resolveできる節がなかった
+          (solve {@p @q})))]})) ; resolution前の節も残しておく
+    \end{minted}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{3. Egisonでの実装}
+  \begin{exampleblock}{rename-problem}
+    \begin{minted}{racket}
+> (show-clauses p1)
+"{{~P(g(x), y), P(x, f(x, y))}
+ {~P(c, y)}
+ {P(g(g(c)), c)}}"
+> (show-clauses (rename-problem 0 p1))
+"{{~P(g(x), y), P(x, f(x, y))}
+ {~P(c, z)}
+ {P(g(g(c)), c)}}"
+    \end{minted}
+  \end{exampleblock}
+\end{frame}
+
+\subsection{例1: 自然言語の文からの推論}
+\begin{frame}[fragile]{3. Egisonでの実装 / 例1}
+  \begin{itemize}
+    \item 次のような問題を考える
+    \begin{itemize}
+      \item Kate is a girl.
+      \item Joe's friends are all tall.
+      \item Harry loves any girl that is tall.
+      \item Kate is a friend of Joe.
+      \item Does Harry love any of Joe's friends? If he does, who does he love?
+    \end{itemize}
+    \item 命題にして連言標準形にすると
+    \vspace{-5pt}
+    \[
+    \{G(k)\} \, \{\lnot F(j, x), T(x)\} \, \{\lnot G(y), \lnot T(y), L(h, y)\} \, \{F(j, k)\} \, \{\lnot L(h, z), \lnot F(j, z)\}
+    \]
+    \item Egisonで書くと
+    \begin{minted}[fontsize=\scriptsize]{racket}
+(define $p7
+  {{<Lit 1 (app "G" (app "k"))>}
+   {<Lit -1 (app "F" (app "j") (var x))> <Lit 1 (app "T" (var x))>}
+   {<Lit -1 (app "G" (var y))> <Lit -1 (app "T" (var y))>
+      <Lit 1 (app "L" (app "h") (var y))>}
+   {<Lit 1 (app "F" (app "j") (app "k"))>}
+   {<Lit -1 (app "L" (app "h") (var z))>
+      <Lit -1 (app "F" (app "j") (var z))>}})
+    \end{minted}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{3. Egisonでの実装 / 例1}
+  \begin{itemize}
+    \item 実行してみる
+    \begin{minted}[fontsize=\tiny]{text}
+> (solve p7)
+...
+{{G(k)}
+ {~F(j, x), T(x)}
+ {~G(y), ~T(y), L(h, y)}
+ {F(j, k)}
+ {~L(h, z), ~F(j, z)}
+ {~T(k), L(h, k)}
+ {~F(j, z), ~G(z), L(h, z)}
+ {T(k)}
+ {~F(j, k), L(h, k)}
+ {~G(5), ~T(5), ~F(j, 5)}
+ {~L(h, k)}
+ {~T(k), ~F(j, k)}
+ {~G(k), L(h, k)}
+ {~F(j, 10), ~G(10), ~F(j, 10)}
+ {~F(j, 5), ~G(5), ~F(j, 5)}
+ {L(h, k)}
+ {~G(k), ~T(k)}
+ {~F(j, k), ~F(j, k)}
+ {~T(k)}
+ {~F(j, k), ~G(k)}
+ {~F(j, k)}
+ {~G(k)}
+ {}}
+<REFUTE>
+    \end{minted}
+    \item 3回目の\code{solve}で空節が導かれた
+    \item 節がとても多くなる = 探索空間が広くなりすぎる
+  \end{itemize}
+\end{frame}
+
+\subsection{例2: 群の公理}
+\begin{frame}[fragile]{3. Egisonでの実装 / 例2}
+  \begin{itemize}
+    \item 群の公理から導けるはずの命題を証明してみる
+    \item 群の公理:
+    \vspace{-10pt}
+    \begin{align*}
+      (x \cdot y) \cdot z &= x \cdot (y \cdot z) \\
+      x \cdot x^{-1} &= e \\
+      x \cdot e &= x
+    \end{align*}
+    \item 等式についての公理を追加:
+    \vspace{-10pt}
+    \begin{align*}
+      x &= x \\
+      x = y &\lor x \neq y \\
+      x = y \land y = z &\rightarrow x = z \\
+      x = y \land z = w &\rightarrow x \cdot z = y \cdot w \\
+      x = y &\rightarrow x^{-1} = y^{-1}
+    \end{align*}
+    \item $e \cdot x = x, \quad x^{-1} \cdot x = x$を証明してみたい
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{3. Egisonでの実装 / 例2}
+  \begin{itemize}
+    \item これらをEgisonで表現すると以下
+    \begin{minted}[fontsize=\scriptsize]{racket}
+(define $p3
+  {@axioms-of-groups
+   @axioms-of-equality
+   ; (negation of) the goal: $e \cdot x = x$
+   {<Lit -1 <Compound "="
+     {<Compound "p" {<Compound "e" {}> <Compound "e1" {}>}>
+      <Compound "e1" {}>}>>}
+
+(define $p4
+  {@axioms-of-groups
+   @axioms-of-equality
+   ; (negation of) the goal: $x^{-1} \cdot x = e$
+   {<Lit -1 <Compound "="
+     {<Compound "p" {<Compound "i" {<Compound "e2" {}>}>
+                     <Compound "e2" {}>}>
+      <Compound "e" {}>}>>}
+    \end{minted}
+
+    \item 探索空間が広過ぎて答えが導けない
+    \item これを等式論理の性質などを用いて解けるようにするのが来週以降の目標
+  \end{itemize}
+\end{frame}
+
+\setcounter{framenumber}{\value{finalframe}}
+\end{document}

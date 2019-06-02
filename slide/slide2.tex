@@ -1,0 +1,221 @@
+\documentclass[dvipdfmx,11pt,notheorems]{beamer}
+%%%% 和文用 %%%%%
+\usepackage{bxdpx-beamer}
+\usepackage{pxjahyper}
+\usepackage{minijs}%和文用
+\usepackage{wrapfig}
+\usepackage{txfonts}
+\usepackage{minted}
+\usepackage{ascmac}
+\usepackage{tikz}
+\usepackage{bussproofs}
+\setminted{
+    breaklines,
+    mathescape=true,
+    fontsize=\footnotesize,
+}
+\renewcommand{\kanjifamilydefault}{\gtdefault}%和文用
+
+%%%% スライドの見た目 %%%%%
+\usetheme{Madrid}
+\usefonttheme{professionalfonts}
+\setbeamertemplate{frametitle}[default][center]
+\setbeamertemplate{navigation symbols}{}
+\setbeamercovered{transparent}%好みに応じてどうぞ）
+\setbeamertemplate{footline}[page number]
+\setbeamerfont{footline}{size=\normalsize,series=\bfseries}
+\setbeamercolor{footline}{fg=black,bg=black}
+%%%%
+
+%%%% 定義環境 %%%%%
+\usepackage{amsmath,amssymb}
+\usepackage{amsthm}
+\theoremstyle{definition}
+\newtheorem{theorem}{定理}
+\newtheorem{definition}{定義}
+\newtheorem{proposition}{命題}
+\newtheorem{lemma}{補題}
+\newtheorem{corollary}{系}
+\newtheorem{conjecture}{予想}
+\newtheorem*{remark}{Remark}
+\renewcommand{\proofname}{}
+%%%%%%%%%
+
+%%%%% フォント基本設定 %%%%%
+\usepackage[T1]{fontenc}%8bit フォント
+\usepackage{textcomp}%欧文フォントの追加
+\usepackage[utf8]{inputenc}%文字コードをUTF-8
+\usepackage{otf}%otfパッケージ
+\usepackage{bm}%数式太字
+%%%%%%%%%%
+
+\newcommand{\code}[1]{\mintinline{text}{#1}}
+\newcommand{\red}[1]{{\color{red} #1}}
+\newcommand{\blue}[1]{{\color{blue} #1}}
+\newcommand{\defines}{\ensuremath{\overset{\text{def}}{\,\Longleftrightarrow\,}}}
+
+\title[]{Term Rewriting System入門}%[略タイトル]{タイトル}
+\author[]{服部桃子}%[略名前]{名前}
+% \institute[]{}%[略所属]{所属}
+\date{\today}%日付
+\begin{document}
+
+\begin{frame}[plain]\frametitle{}
+\titlepage %表紙
+\end{frame}
+
+\begin{frame}{Contents}
+  Handbook of Practical Logic and Automated Reasoningの4.5〜4.7節
+  \begin{wrapfigure}{r}[20pt]{5cm}
+    \includegraphics[width=100pt]{plar.jpg}
+  \end{wrapfigure}
+
+  \tableofcontents %目次
+\end{frame}
+
+\section{前回の問題設定}
+\begin{frame}{前回のあらすじ}
+  \begin{itemize}
+    \item Egison入門
+    \item 導出原理のEgisonでの実装
+    \item 群の公理から、$e\cdot x = x,\quad x^{-1} \cdot x = e$を導きたい
+    \begin{exampleblock}{群の公理}
+      \vspace{-10pt}
+      \begin{align*}
+        (x \cdot y) \cdot z &= x \cdot (y \cdot z) \\
+        x \cdot x^{-1} &= e \\
+        x \cdot e &= x
+      \end{align*}
+    \end{exampleblock}
+  \end{itemize}
+\end{frame}
+
+\section{項書き換え系(TRS)}
+
+\begin{frame}{項書き換え系(TRS)とは}
+  \begin{itemize}
+    \item $R$ : 書き換え規則$l = r$の集合
+    \item 規則に従って与えられた項を書き換えていく
+    \begin{itemize}
+      \item 左から右に書き換える
+    \end{itemize}
+    \item 任意の「等しい」項が同じ標準形を持つと仮定すると、
+
+    $s \overset{?}{=} t$を示したいならば、
+    $s, t$を標準形になるまで書き換えて比較すればよい
+  \end{itemize}
+  \begin{exampleblock}{例: 自然数の足し算}
+    $R = \{O + x = x, \quad S(x) + y = x + S(y)\}$
+    \begin{align*}
+      S(O) + S(S(O))
+      &\rightarrow O + S(S(S(O))) \quad ()\\
+      &\rightarrow S(S(S(O))) \quad \blue{\leftarrow \text{標準形}}
+    \end{align*}
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{項書き換え系(TRS)とは}
+  うまくいかない場合もある
+  \begin{exampleblock}{停止性がない場合}
+    $R = \{x + y = y + x\}$
+    \vspace{-5pt}
+    \[
+    a + b \rightarrow b + a \rightarrow a + b \rightarrow b + a \rightarrow a + b \rightarrow \cdots
+    \]
+  \end{exampleblock}
+
+  \begin{exampleblock}{合流性がない場合}
+    $R = \{x \cdot (y + z) = x \cdot y + x \cdot z,\, (x + y) \cdot z = x \cdot z + y \cdot z\}$
+    \begin{align*}
+      (a + b) \cdot (c + d)
+      &\rightarrow a \cdot (c + d) + b \cdot (c + d) \\
+      &\rightarrow^* (a \cdot c + a \cdot d) + (b \cdot c + b \cdot d) \\
+      (a + b) \cdot (c + d)
+      &\rightarrow (a + b) \cdot c + (a + b) \cdot d \\
+      &\rightarrow^* (a \cdot c + a \cdot c) + (a \cdot d + b \cdot d)
+    \end{align*}
+  \end{exampleblock}
+\end{frame}
+
+\subsection{停止性, 合流性(confluence)}
+\begin{frame}{停止性・合流性}
+  \begin{screen}
+    $X$ : 集合 \hspace{10pt} $\rightarrow$ : $X$上の簡約関係(2項関係)
+  \end{screen}
+
+  \begin{block}{定義}
+    \vspace{-10pt}
+    \begin{align*}
+      x\text{が\red{正規形}である} &\defines
+      \lnot (\exists y \in X. \, x \rightarrow y) \\
+      \text{簡約関係が\red{停止性を持つ}} &\defines \text{無限の簡約列が存在しない} \\
+      x\text{と}y\text{が\red{合流可能}} (x \downarrow y) &\defines \exists z.\, x \rightarrow^* z \land y \rightarrow^* z
+    \end{align*}
+  \end{block}
+\end{frame}
+
+\begin{frame}{停止性・合流性}
+  \begin{block}{定義}
+    簡約関係$\rightarrow$が\red{合流性を持つ}
+    \vspace{-5pt}
+    \[
+      \defines
+      \forall x, y, z.\, (x \rightarrow y \land x \rightarrow z) \Rightarrow
+      \exists w. \, y \rightarrow^* w \land z \rightarrow^* w
+    \]
+  \end{block}
+
+  \begin{table}[h]
+    \begin{tabular}{ccc}
+      ダイアモンド性 & 合流性 & 弱合流性 \\
+      \begin{tikzpicture}[>=stealth, every edge/.style={->, draw}]
+        \node at (1, 2) (x) {$x$};
+        \node at (0, 1) (y) {$y$};
+        \node at (2, 1) (z) {$z$};
+        \node at (1, 0) (w) {$w$};
+
+        \draw[->] (x) -- (y);
+        \draw[->] (x) -- (z);
+        \draw[->] (y) -- (w);
+        \draw[->] (z) -- (w);
+      \end{tikzpicture}
+      &
+      \begin{tikzpicture}[>=stealth, every edge/.style={->, draw}]
+        \node at (1, 2) (x) {$x$};
+        \node at (0, 1) (y) {$y$};
+        \node at (2, 1) (z) {$z$};
+        \node at (1, 0) (w) {$w$};
+
+        \draw[->] (x) -- (y);
+        \draw[->] (x) -- (z);
+        \draw[->>][blue] (y) -- (w);
+        \draw[->>][blue] (z) -- (w);
+      \end{tikzpicture}
+      &
+      \begin{tikzpicture}[>=stealth, every edge/.style={->, draw}]
+        \node at (1, 2) (x) {$x$};
+        \node at (0, 1) (y) {$y$};
+        \node at (2, 1) (z) {$z$};
+        \node at (1, 0) (w) {$w$};
+
+        \draw[->>][blue] (x) -- (y);
+        \draw[->>][blue] (x) -- (z);
+        \draw[->>][blue] (y) -- (w);
+        \draw[->>][blue] (z) -- (w);
+        \end{tikzpicture} \\
+      \end{tabular}
+    \end{table}
+  \end{frame}
+
+  \section{Lexicographic Path Orders}
+
+\begin{frame}{}
+\end{frame}
+
+\section{Knuth-Bendix Completion}
+
+\begin{frame}{}
+\end{frame}
+
+% \setcounter{framenumber}{\value{finalframe}}
+\end{document}

@@ -19,7 +19,7 @@
 %%%% スライドの見た目 %%%%%
 \usetheme{Madrid}
 \usefonttheme{professionalfonts}
-\setbeamertemplate{frametitle}[default][center]
+\setbeamertemplate{frametitle}[default][left]
 \setbeamertemplate{navigation symbols}{}
 \setbeamercovered{transparent}%好みに応じてどうぞ）
 \setbeamertemplate{footline}[page number]
@@ -53,8 +53,9 @@
 \newcommand{\red}[1]{{\color{red} #1}}
 \newcommand{\blue}[1]{{\color{blue} #1}}
 \newcommand{\defines}{\ensuremath{\overset{\text{def}}{\,\Longleftrightarrow\,}}}
+\newcommand{\underred}[2]{\underset{\color{red} #1}{\underline{\color{red} #2}}}
 
-\title[]{Term Rewriting System入門}%[略タイトル]{タイトル}
+\title[]{項書き換え系入門}%[略タイトル]{タイトル}
 \author[]{服部桃子}%[略名前]{名前}
 % \institute[]{}%[略所属]{所属}
 \date{\today}%日付
@@ -92,7 +93,7 @@
 
 \section{項書き換え系(TRS)}
 
-\begin{frame}{項書き換え系(TRS)とは}
+\begin{frame}{TRS / 概要}
   \begin{itemize}
     \item $R$ : 書き換え規則$l = r$の集合
     \item 規則に従って与えられた項を書き換えていく
@@ -114,7 +115,7 @@
   \end{exampleblock}
 \end{frame}
 
-\begin{frame}{項書き換え系(TRS)とは}
+\begin{frame}{TRS / 概要}
   うまくいかない場合もある
   \begin{exampleblock}{停止性がない場合}
     $R = \{x + y = y + x\}$
@@ -138,7 +139,7 @@
 \end{frame}
 
 \subsection{停止性, 合流性(confluence)}
-\begin{frame}{停止性・合流性}
+\begin{frame}{TRS / 停止性・合流性}
   \begin{screen}
     $X$ : 集合 \hspace{10pt} $\rightarrow$ : $X$上の簡約関係(2項関係)
   \end{screen}
@@ -154,14 +155,14 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{停止性・合流性}
+\begin{frame}{TRS / 停止性・合流性}
   \begin{block}{定義}
     簡約関係$\rightarrow$が\red{合流性を持つ}
     \vspace{-5pt}
     \[
       \defines
-      \forall x, y, z.\, (x \rightarrow y \land x \rightarrow z) \Rightarrow
-      \exists w. \, y \rightarrow^* w \land z \rightarrow^* w
+      \forall x, y, y'.\, (x \rightarrow^* y \land x \rightarrow^* y') \Rightarrow
+      \exists z. \, (y \rightarrow^* z \land y' \rightarrow^* z)
     \]
   \end{block}
 
@@ -171,9 +172,8 @@
       \begin{tikzpicture}[>=stealth, every edge/.style={->, draw}]
         \node at (1, 2) (x) {$x$};
         \node at (0, 1) (y) {$y$};
-        \node at (2, 1) (z) {$z$};
-        \node at (1, 0) (w) {$w$};
-
+        \node at (2, 1) (z) {$y'$};
+        \node at (1, 0) (w) {$z$};
         \draw[->] (x) -- (y);
         \draw[->] (x) -- (z);
         \draw[->] (y) -- (w);
@@ -183,11 +183,10 @@
       \begin{tikzpicture}[>=stealth, every edge/.style={->, draw}]
         \node at (1, 2) (x) {$x$};
         \node at (0, 1) (y) {$y$};
-        \node at (2, 1) (z) {$z$};
-        \node at (1, 0) (w) {$w$};
-
-        \draw[->] (x) -- (y);
-        \draw[->] (x) -- (z);
+        \node at (2, 1) (z) {$y'$};
+        \node at (1, 0) (w) {$z$};
+        \draw[->>][blue] (x) -- (y);
+        \draw[->>][blue] (x) -- (z);
         \draw[->>][blue] (y) -- (w);
         \draw[->>][blue] (z) -- (w);
       \end{tikzpicture}
@@ -195,26 +194,400 @@
       \begin{tikzpicture}[>=stealth, every edge/.style={->, draw}]
         \node at (1, 2) (x) {$x$};
         \node at (0, 1) (y) {$y$};
-        \node at (2, 1) (z) {$z$};
-        \node at (1, 0) (w) {$w$};
-
-        \draw[->>][blue] (x) -- (y);
-        \draw[->>][blue] (x) -- (z);
+        \node at (2, 1) (z) {$y'$};
+        \node at (1, 0) (w) {$z$};
+        \draw[->] (x) -- (y);
+        \draw[->] (x) -- (z);
         \draw[->>][blue] (y) -- (w);
         \draw[->>][blue] (z) -- (w);
-        \end{tikzpicture} \\
-      \end{tabular}
-    \end{table}
-  \end{frame}
+      \end{tikzpicture} \\
+    \end{tabular}
+  \end{table}
 
-  \section{Lexicographic Path Orders}
-
-\begin{frame}{}
+  \begin{alertblock}{}
+    \[
+    \text{ダイアモンド性} \quad
+    \begin{array}{c}
+    \Rightarrow \\
+    \nLeftarrow \\
+    \end{array} \quad
+    \text{合流性} \quad
+    \begin{array}{c}
+    \Rightarrow \\
+    \nLeftarrow \\
+    \end{array} \quad
+    \text{弱合流性}
+    \]
+  \end{alertblock}
 \end{frame}
 
-\section{Knuth-Bendix Completion}
+\begin{frame}{TRS / 停止性・合流性}
+  % \begin{screen}
+  %   簡約関係$\rightarrow$が\red{合流性を持つ}
+  %   \vspace{-5pt}
+  %   \[
+  %     \defines
+  %     \forall x, y, y'.\, (x \rightarrow^* y \land x \rightarrow^* y') \Rightarrow
+  %     \exists z. \, (y \rightarrow^* z \land y' \rightarrow^* z)
+  %   \]
+  % \end{screen}
+  \begin{block}{定理}
+    $\rightarrow$が停止性と弱合流性を持つならば、$\rightarrow$は合流性を持つ
+  \end{block}
+  証明:
 
-\begin{frame}{}
+  $x \rightarrow^* y$かつ$x \rightarrow^* y'$かつ$y, y'$が正規形ならば、$y = y'$であることを整礎帰納法で示す。
+
+  \begin{itemize}
+    \item $x$がすでに正規形の場合: $x = y = y'$
+    \item $x \rightarrow w \rightarrow^* y,\, x\rightarrow w' \rightarrow^* y'$
+    なる$w, w'$があるとき
+
+    弱合流性より $\exists z.\, (x \rightarrow w \rightarrow^* z) \land (x \rightarrow w' \rightarrow^* z) \land (z$は正規形)
+
+    帰納法の仮定から、$y = z$かつ$y' = z \qed$
+  \end{itemize}
+
+  \begin{alertblock}{整礎帰納法}
+    \[
+      \forall x \in X.\, P(x) \Leftrightarrow \forall x \in X. \, (\forall y \in X. \, x \rightarrow y \Rightarrow P(y)) \Rightarrow P(x)
+    \]
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{TRS / 停止性・合流性}
+  \begin{block}{定義}
+    \vspace{-10pt}
+    \begin{align*}
+    \rightarrow\text{が\red{完備 (complete)}}
+    &\defines \rightarrow \text{が停止性と合流性を持つ} \\
+    &\Longleftrightarrow \rightarrow\text{が停止性と弱合流性を持つ}
+    \end{align*}
+  \end{block}
+\end{frame}
+
+\section{Lexicographic Path Orders}
+\begin{frame}{LPO / 概要}
+  \begin{block}{概要}
+    \begin{itemize}
+      \item 項の\red{「サイズ」}を計算する方法を考える
+      \item \red{簡約 $=$ 項のサイズを減らす操作} となるように設定する
+    \end{itemize}
+  \end{block}
+
+  \begin{block}{motivation}
+    \begin{itemize}
+      \item 簡約が\red{停止性}をもつことを保証したい
+      \begin{itemize}
+        \item サイズは正の値を取る
+        \item 完備化(後述)で新しい書換え規則を追加する際に規則の向きを決めるために利用
+      \end{itemize}
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}{LPO / 準備}
+  \begin{block}{定義: rewrite order}
+    項についての二項関係$>$が\red{rewrite order}であるとは、
+    \begin{itemize}
+      \item $>$は非対称
+      \item $>$は推移的
+      \item $s > t$なら、任意の代入$\theta$について$s \theta > t \theta$
+      \begin{itemize}
+        \item 変数を用いた式を具体的な式にinstantiateするときに順番が不変
+      \end{itemize}
+      \item $s > t$なら、
+      \vspace{-5pt}
+      \[
+      f(u_1, \ldots, u_{i-1}, \red{s}, u_{i+1}, \ldots, u_{n}) >
+      f(u_1, \ldots, u_{i-1}, \red{t}, u_{i+1}, \ldots, u_{n})
+      \]
+    \end{itemize}
+  \end{block}
+
+  \begin{block}{定義: reduction order}
+    \centering
+    $>$が\red{reduction order}$\defines$
+    $>$がrewrite orderでかつ停止性を持つ
+  \end{block}
+\end{frame}
+
+\begin{frame}{LPO / 準備}
+  \begin{block}{補題}
+  $>$がreduction orderであって
+  \[
+  \forall (l = r) \in R. \, l > r
+  \]
+  ならば、簡約関係$\rightarrow_R$は停止性を持つ
+  \end{block}
+
+  \pause
+  \begin{alertblock}{次に考えること}
+    \begin{itemize}
+      \item 項のサイズ$|t|$を適切に定義
+      \item $s > t \defines |s| > |t|$としたとき、$>$がreduction orderになるようにする
+    \end{itemize}
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{LPO / サイズの計算}
+  ナイーブな方法ではうまくいかない
+  \begin{exampleblock}{例1}
+    全ての変数・関数シンボルのサイズを1とし、それらの和を全体のサイズとした場合
+    \vspace{-10pt}
+    \begin{align*}
+      f(x, x) \, \red{(3)} &> g(y)\,\red{(2)} \\
+      f(x, x) \, \red{(3)} &\not> g(f(x, x))\,\red{(4)}
+    \end{align*}
+  \end{exampleblock}
+
+  \begin{exampleblock}{例2}
+    左辺の方が右辺より大きくなるようなサイズとは？
+    \[
+    (x \cdot y) \cdot z = x \cdot (y \cdot z)
+    \]
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{LPO / サイズの計算}
+  \begin{block}{$>$の定義}
+    \begin{itemize}
+      \item $s_1, \ldots, s_m$が$t_1, \ldots, t_m$より辞書順で大きく、
+
+      かつ$\forall i \in \{1, \ldots, m\}.\, f(s_1, \ldots, s_m) > t_i$なら
+
+      $f(s_1, \ldots, s_m) > f(t_1, \ldots, t_m)$
+
+      \item $s_i \geq t$なら$f(s_1, \ldots, s_m) > t$
+
+      \item 規定の関数シンボルについての条件から$f>g$で、
+
+      かつ$\forall i \in \{1, \ldots, m\}.\, f(s_1, \ldots, s_m) > t_i$なら
+
+      $f(s_1, \ldots, s_m) > g(t_1, \ldots, t_n)$
+    \end{itemize}
+
+    ※\blue{青字}は停止性のための条件
+  \end{block}
+
+  \begin{exampleblock}{}
+    \begin{itemize}
+      \item $(x \cdot y) \cdot z > x \cdot (y \cdot z)$
+      \item $(x + y) \cdot z > x \cdot z + y \cdot z$
+      \begin{itemize}
+        \item 3番目の規則と$\cdot > +$より
+      \end{itemize}
+      \item $(x + y) \cdot z \not> (y + x) \cdot z + z$ \hspace{10pt} (非停止な例)
+      \begin{itemize}
+        \item $\cdot > +$だが、停止性の部分で引っかかる
+      \end{itemize}
+    \end{itemize}
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{LPO / サイズの計算}
+  \begin{block}{$>$の定義}
+    \begin{itemize}
+      \item $s_1, \ldots, s_m$が$t_1, \ldots, t_m$より辞書順で大きく、
+
+      かつ$\forall i \in \{1, \ldots, m\}.\, f(s_1, \ldots, s_m) > t_i$なら
+
+      $f(s_1, \ldots, s_m) > f(t_1, \ldots, t_m)$
+
+      \item $s_i \geq t$なら$f(s_1, \ldots, s_m) > t$
+
+      \item 規定の関数シンボルについての条件から$f>g$で、
+
+      かつ$\forall i \in \{1, \ldots, m\}.\, f(s_1, \ldots, s_m) > t_i$なら
+
+      $f(s_1, \ldots, s_m) > g(t_1, \ldots, t_n)$
+    \end{itemize}
+
+    ※\blue{青字}は停止性のための条件
+  \end{block}
+  \begin{block}{定理}
+    上のように$>$が定義されたとき、$>$はreduction order
+  \end{block}
+\end{frame}
+
+\section{Knuth-Bendix 完備化}
+
+\begin{frame}{Knuth-Bendix完備化}
+  \begin{wrapfigure}{r}{0.4\textwidth}
+    \vspace{-20pt}
+    \begin{screen}
+      \vspace{-15pt}
+      \begin{align*}
+        (x \cdot y) \cdot z &= x \cdot (y \cdot z) \\
+        x^{-1} \cdot x &= e \\
+        e \cdot x &= x
+      \end{align*}
+    \end{screen}
+  \end{wrapfigure}
+  群の公理を書き換え系とみなすと、
+
+  これは停止性を持つが弱合流性を持たない
+  \begin{align*}
+    \red{(x^{-1}\cdot x) \cdot y} &\rightarrow x^{-1} \cdot (x \cdot y) \not\rightarrow \\
+    (\red{x^{-1}\cdot x}) \cdot y &\rightarrow e \cdot y \rightarrow y
+  \end{align*}
+
+  \pause
+  \begin{block}{Knuth-Bendix完備化: 概要}
+    \begin{itemize}
+      \item 与えられた書き換え規則の集合に規則を追加して完備にする
+      \item 万能ではない
+      \begin{itemize}
+        \item 完備化失敗として終了 or 非停止 になりうる
+      \end{itemize}
+    \end{itemize}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Knuth-Bendix完備化 / 危険対}
+  \begin{wrapfigure}{r}{0.3\textwidth}
+    \vspace{-20pt}
+    \begin{screen}
+      \vspace{-15pt}
+      \begin{align*}
+        (x \cdot y) \cdot z &= x \cdot (y \cdot z) \\
+        x^{-1} \cdot x &= e \\
+        e \cdot x &= x
+      \end{align*}
+    \end{screen}
+  \end{wrapfigure}
+
+  ある要素に2通りの書き換えが可能な場合
+
+  \begin{enumerate}
+    \item 異なる重なりのない箇所を書き換えた場合
+    \vspace{-5pt}
+    \begin{align*}
+      (\red{e \cdot x}) \cdot (y^{-1} \cdot y) &\rightarrow x \cdot (y^{-1} \cdot y) \\
+      (e \cdot x) \cdot (\red{y^{-1} \cdot y}) &\rightarrow (e \cdot x) \cdot 1
+    \end{align*}
+    \item 一方の書き換え箇所が他方に適用された規則において変数である場合
+    \vspace{-5pt}
+    \begin{align*}
+      \red{((}e \cdot x\red{) \cdot y) \cdot z} &\rightarrow (e \cdot x) \cdot (y \cdot z) \\
+      ((\red{e \cdot x}) \cdot y) \cdot z &\rightarrow x \cdot (y \cdot z)
+    \end{align*}
+    \item 同じ場所を書き換えた場合(overlap)
+    \vspace{-5pt}
+    \begin{align*}
+      \red{(e \cdot x) \cdot y} &\rightarrow e \cdot (x \cdot y) \\
+      (\red{e \cdot x}) \cdot y &\rightarrow x \cdot y
+    \end{align*}
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Knuth-Bendix完備化 / 危険対}
+  \begin{block}{定義: 危険対}
+    $l_1 = r_1, l_2 = r_2$を書き換え規則とする(ただし$FV(l_1) \cap FV(l_2) = \emptyset$)
+
+    $l_2'$が$l_1$の変数でないsubtermとして1回以上出現し、
+    \[
+    \left(l_1 = l_1 [l_2', \cdots, l_2', \cdots, l_2']\right)
+    \]
+    $\sigma$が$l_2$と$l_2'$の最汎単一化子であるとき、
+    \[
+    (\sigma r_1,\, \sigma \,l_1 [l_2', \cdots, r_2, \cdots, l_2'])
+    \]
+    を$l_1 = r_1, l_2 = r_2$の\red{危険対}という
+  \end{block}
+
+  \begin{exampleblock}{例}
+    $(e \cdot (x \cdot y),\, x \cdot y)$や$(x^{-1} \cdot (x \cdot y),\, e \cdot y)$は危険対
+    \vspace{-5pt}
+    \[
+    \begin{array}{ll}
+      \left\{\begin{array}{l}
+      \red{(e \cdot x) \cdot y} \rightarrow e \cdot (x \cdot y) \\
+      (\red{e \cdot x}) \cdot y \rightarrow x \cdot y \\
+      \end{array} \right.
+      &
+      \left\{
+      \begin{array}{l}
+      \red{(x^{-1}\cdot x) \cdot y} \rightarrow x^{-1} \cdot (x \cdot y) \\
+      (\red{x^{-1}\cdot x}) \cdot y \rightarrow e \cdot y \\
+      \end{array}
+      \right. \\
+    \end{array}
+    \]
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Knuth-Bendix 完備化 / 危険対}
+  \begin{block}{定理: Knuth-Bendixの合流条件}
+    項書き換え系が弱合流性を持つ
+    $\Longleftrightarrow$ 全ての危険対$(s, t)$が合流可能 ($s \downarrow t$)
+  \end{block}
+
+  \begin{block}{Corollaly}
+    停止性を持つ項書き換え系が合流性を持つ
+
+    $\Longleftrightarrow$ 全ての危険対$(s, t)$が合流可能 ($s \downarrow t$)
+  \end{block}
+
+  \begin{block}{合流可能性$s \downarrow t$について}
+    \begin{enumerate}
+      \item $s$と$t$の正規形を求める($s', t'$とする)
+      \begin{itemize}
+        \item 停止性より決定可能
+      \end{itemize}
+      \item $s' \overset{?}{\equiv} t'$
+    \end{enumerate}
+  \end{block}
+\end{frame}
+
+% \begin{frame}{Knuth-Bendix完備化 / 合流条件(証明)}
+%   \begin{block}{補題}
+%     $l_1 = r_1, l_2 = r_2$を共通の変数を持たない等式とする。
+%
+%     $s \rightarrow_{l_1=r_1} t_1$かつ$s\rightarrow_{l_2=r_2} t_2$で$\lnot (t_1 \downarrow t_2)$ならば、
+%
+%     $t_1$と$t_2$は1つのsubtermでのみ次のように異なり、$(u_1, u_2)$は危険対
+%     \vspace{-10pt}
+%     \[
+%       t_1 = u[\ldots, \red{u_1}, \ldots] \quad
+%       t_2 = u[\ldots, \red{u_2}, \ldots]
+%     \]
+%   \end{block}
+%   \begin{block}{定理: Knuth-Bendixの合流条件}
+%     項書き換え系が弱合流性を持つ
+%     $\Longleftrightarrow$ 全ての危険対$(s, t)$が合流可能 ($s \downarrow t$)
+%   \end{block}
+%
+%   証明:
+%
+%   $(\Rightarrow)$ 明らか(危険対はある項から1stepの簡約で生じる項の対)
+%
+%   $(\Leftarrow)$
+%
+% \end{frame}
+
+\begin{frame}{Knuth-Bendix完備化 / アルゴリズム}
+  \begin{block}{アルゴリズム}
+    \begin{enumerate}
+      \item 危険対$\{(s_i, t_i) \mid 1 \leq i \leq n\}$を全て見つける
+      \item $s_i \rightarrow^* s_i', \, t_i \rightarrow^* t_i'$に正規化する
+      \item $s_i' \equiv t_i'$ならばその危険対は無視
+      \item $s_i' \not\equiv t_i'$ならば
+      \begin{itemize}
+        \item $s_i' > t_i'$ならば$s_i' \rightarrow t_i'$を規則に追加
+        \item $s_i' < t_i'$ならば$t_i' \rightarrow s_i'$を規則に追加
+        \item どちらでもなければ\red{完備化失敗}
+      \end{itemize}
+
+      \item (冗長な規則を消去する)
+    \end{enumerate}
+  \end{block}
+
+  \begin{alertblock}{注意}
+    新しい規則の追加によって新しい危険対が生じる可能性があり、
+    これが続けば完備化が非停止
+  \end{alertblock}
 \end{frame}
 
 % \setcounter{framenumber}{\value{finalframe}}

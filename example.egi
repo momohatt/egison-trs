@@ -87,7 +87,7 @@
 ; It is known that (3) and (5) above are redundant, i.e., provable from other axioms. Let's prove this!
 
 (define $eql (lambda [$x $y] (app "=" x y)))
-(define $p (lambda [$x $y] (app "p" x y))) ; product
+(define $p (lambda [$x $y] (app "*" x y))) ; product
 (define $i (lambda $x (app "i" x)))        ; inverse
 (define $e (app "e"))
 (define $e1 (app "e1"))
@@ -204,13 +204,19 @@
 
 ; not working with naive
 (define $p8
-  {@axioms-of-nat
-   @axioms-of-equality
+  {@axioms-of-equality
+   @axioms-of-nat
    ; S(O) + S(S(O)) = S(S(S(O)))
    {<Lit -1 (eql (app "+" one two) three)>}})
 
 (define $p9
-  {@axioms-of-nat
-   @axioms-of-equality
+  {@axioms-of-equality
+   @axioms-of-nat
    ; O + S(S(O)) = S(S(O))
    {<Lit -1 (eql (app "+" zero two) two)>}})
+
+(define $p10
+  {@axioms-of-equality
+   {<Lit 1 (eql (app "+" (app "S" (var x)) (var y))
+                (app "+" (var x) (app "S" (var y))))>}
+   {<Lit -1 (eql (app "+" one two) (app "+" zero three))>}})

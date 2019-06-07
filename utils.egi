@@ -30,8 +30,12 @@
      [<var ,3> "w"]
      [<var $x> (append-strings {"x" (show x)})]
      [<compound $f ,{}> f]
-     [<compound ,"=" <cons $x <cons $y _>>>
+     [<compound ,"=" <cons $x <cons $y <nil>>>>
        (append-strings {(show-term x) " = " (show-term y)})]
+     [<compound ,"+" <cons $x <cons $y <nil>>>>
+       (append-strings {(show-term x) " + " (show-term y)})]
+     [<compound ,"*" <cons $x <cons $y <nil>>>>
+       (append-strings {(show-term x) " * " (show-term y)})]
      [<compound $f $xs>
        (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
     }))

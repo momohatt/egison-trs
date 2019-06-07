@@ -85,6 +85,16 @@
          _>>
       {@(subst-clause σ xs) @(subst-clause σ ys)}]}))
 
+; positive resolution
+(define $presolution
+  (match-all-lambda (multiset (multiset literal))
+   {[<cons
+       (& !<cons <lit ,-1 _> _> <cons <lit ,1 $t> $xs>)
+       <cons
+         <cons <lit ,-1 (& <unify ,t $σ> $s)> $ys>
+           _>>
+       {@(subst-clause σ xs) @(subst-clause σ ys)}]}))
+
 ; 束縛変数の名前が各節で異なるようにする
 (define $rename-problem
   (match-lambda [integer (list (list literal))]
@@ -112,9 +122,11 @@
   (match-all-lambda (list eq)
     [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
 
-(define $unique-clause
-  (match-all-lambda (list (multiset eq))
-    [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
+(define $trim-clause
+  (lambda [$clss]
+    (filter-clause
+      (match-all clss (list (multiset eq))
+        [<join _ <cons $z !<join _ <cons ,z _>>>> z]))))
 
 (define $solve
   (match-lambda (multiset (multiset literal))
@@ -124,5 +136,17 @@
       (let {[$q (resolution (rename-problem 0 p))]}
         (if (include?/m (multiset literal) p q) ; q \subseteq? p
           <SATURATED>
-          (let {[$r (unique-clause {@p @q})]}
+          (let {[$r (trim-clause {@p @q})]}
             (solve (debug-c r)))))]}))
+
+; positive closure
+(define $psolve
+  (match-lambda (multiset (multiset literal))
+    {[<cons <nil> _> ; 空節が導出できた
+      <REFUTE>]
+     [$p
+      (let {[$q (presolution (rename-problem 0 p))]}
+        (if (include?/m (multiset literal) p q) ; q \subseteq? p
+          <SATURATED>
+          (let {[$r (trim-clause {@p @q})]}
+            (psolve (debug-c r)))))]}))

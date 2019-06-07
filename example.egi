@@ -202,7 +202,6 @@
 (define $three (app "S" (app "S" (app "S" (app "O")))))
 (define $four  (app "S" (app "S" (app "S" (app "S" (app "O"))))))
 
-; not working with naive
 (define $p8
   {@axioms-of-equality
    @axioms-of-nat
@@ -214,9 +213,3 @@
    @axioms-of-nat
    ; O + S(S(O)) = S(S(O))
    {<Lit -1 (eql (app "+" zero two) two)>}})
-
-(define $p10
-  {@axioms-of-equality
-   {<Lit 1 (eql (app "+" (app "S" (var x)) (var y))
-                (app "+" (var x) (app "S" (var y))))>}
-   {<Lit -1 (eql (app "+" one two) (app "+" zero three))>}})

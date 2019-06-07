@@ -28,7 +28,7 @@
      [<var ,1> "y"]
      [<var ,2> "z"]
      [<var ,3> "w"]
-     [<var $x> (show x)]
+     [<var $x> (append-strings {"x" (show x)})]
      [<compound $f ,{}> f]
      [<compound ,"=" <cons $x <cons $y _>>>
        (append-strings {(show-term x) " = " (show-term y)})]

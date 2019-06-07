@@ -86,7 +86,6 @@
 ; (5) 1*x = x
 ; It is known that (3) and (5) above are redundant, i.e., provable from other axioms. Let's prove this!
 
-(define $eql (lambda [$x $y] (app "=" x y)))
 (define $p (lambda [$x $y] (app "*" x y))) ; product
 (define $i (lambda $x (app "i" x)))        ; inverse
 (define $e (app "e"))
@@ -177,7 +176,7 @@
   })
 
 (define $p7
-  ; Kate is a girl
+   ; Kate is a girl
   {{<Lit 1 (app "G" (app "k"))>}
    ; Joe's friends are all tall
    {<Lit -1 (app "F" (app "j") (var x))> <Lit 1 (app "T" (var x))>}

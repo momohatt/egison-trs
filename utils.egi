@@ -38,6 +38,8 @@
        (append-strings {(show-term x) " * " (show-term y)})]
      [<compound $f $xs>
        (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
+     [<eq $x $y>
+       (append-strings {(show-term x) " = " (show-term y)})]
     }))
 
 (define $show-lit

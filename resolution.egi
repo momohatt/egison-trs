@@ -7,19 +7,40 @@
     {[<var $> integer
       {[<Var $i> {i}]
        [_ {}]}]
+     ; 関数適用または述語適用
      [<compound $ $> [string (list term)]
       {[<Compound $s $l> {[s l]}]
+       [_ {}]}]
+     ; 等式
+     [<eq $ $> [term term]
+      {[<Eq $l $r> {[l r] [r l]}] ; unordered-pairのように
        [_ {}]}]
      [<unify ,$t $> something
       {[$s (unify t s)]}]
      [$ something
       {[$tgt {tgt}]}]}))
 
+; (define $prop
+;   (matcher
+;     {[<pred $ $> [string (list term)]
+;        {[<Pred $p $a> {[p a]}]
+;         [_ {}]}]
+;      [<eq $ $> [term term]
+;        {[<Eq $l $r> {[l r]}]
+;         [_ {}]}]
+;      ; 要りそう
+;      [<unify ,$t $> something
+;        {[$s (unify t s)]}]
+;      [$ something
+;        {[$tgt {tgt}]}]}))
+
 (define $app
   (cambda $xs
     (match xs (list something)
       {[<cons $x $xs>
         <Compound x xs>]})))
+
+(define $eql (lambda [$x $y] <Eq x y>))
 
 (define $var
   (lambda $n
@@ -28,7 +49,9 @@
 (define $occur
   (pattern-function [$v]
     (| <var v>
-       <compound _ <join _ <cons (occur v) _>>>)))
+       <compound _ <join _ <cons (occur v) _>>>
+       <eq (occur v) _>
+       <eq _ (occur v)>)))
 
 (define $fv
   (match-all-lambda term
@@ -42,7 +65,9 @@
            {[<cons [,n $t] _> t] ; subst規則があればsubst
             [_ <Var n>]})]       ; なければそのまま
        [<compound $f $xs>
-         <Compound f (map (lambda $x (subst u x)) xs)>]})))
+         <Compound f (map (lambda $x (subst u x)) xs)>]
+       [<eq $l $r>
+         <Eq (subst u l) (subst u r)>]})))
 
 ; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
 (define $unify
@@ -60,7 +85,14 @@
          (match (unify (subst u1 <Compound f xs>) (subst u1 <Compound f ys>))
                 (list something)
           {[,{} {}] ; 失敗
-           [<cons $u2 _> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
+           [<cons $u2 <nil>> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
+     [<pair <eq $xl $xr> <eq $yl $yr>>
+      (match (unify xl yl) (list something)
+       {[,{} {}] ; unifyがすでに失敗している
+        [<cons $u1 <nil>> ; unifiableな場合、単一化子u1をsingletonから取り出す
+         (match (unify xr yr) (list something)
+          {[,{} {}]
+           [<cons $u2 <nil>> {@u1 @u2}]})]})]
      [_ {}]}))
 
 (define $literal

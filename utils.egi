@@ -35,10 +35,10 @@
      [<compound ,"+" <cons $x <cons $y <nil>>>>
        (append-strings {(show-term x) " + " (show-term y)})]
      [<compound ,"*" <cons $x <cons $y <nil>>>>
-       (append-strings {(show-term x) " * " (show-term y)})]
+       (append-strings {"(" (show-term x) " * " (show-term y) ")"})]
      [<compound $f $xs>
        (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
-     [<eq $x $y>
+     [<equation $x $y>
        (append-strings {(show-term x) " = " (show-term y)})]
     }))
 

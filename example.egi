@@ -30,12 +30,17 @@
 ; [z / x, x / y] P(g(x), y) = P(g(z), x)
 (assert-equal "subst1"
   (subst {[y <Var x>] [x <Var z>]} t1)
-  <Compound "P" {<Compound "g" {<Var 2>}> <Var 0>}>)
+  (app "P" (app "g" (var z) (var x))))
 
 ; [z / z] P(g(x), y) = P(g(x), y)
 (assert-equal "subst2"
   (subst {[z <Var z>]} t1)
-  <Compound "P" {<Compound "g" {<Var 0>}> <Var 1>}>)
+  (app "P" (app "g" (var x)) (var y)))
+
+(assert-equal "subst3"
+  (subst {[y <Var x>] [x <Var z>]}
+    (eql (app "f" (var x)) (app "+" (var y) (var x))))
+  (eql (app "f" (var z)) (app "+" (var x) (var z))))
 
 ; t1 = P(g(x), y)
 ; t2 = P(g(g(c)), c)

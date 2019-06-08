@@ -12,8 +12,8 @@
       {[<Compound $s $l> {[s l]}]
        [_ {}]}]
      ; 等式
-     [<eq $ $> [term term]
-      {[<Eq $l $r> {[l r] [r l]}] ; unordered-pairのように
+     [<equation $ $> [term term]
+      {[<Equation $l $r> {[l r]}] ; unordered-pairのように
        [_ {}]}]
      [<unify ,$t $> something
       {[$s (unify t s)]}]
@@ -25,8 +25,8 @@
 ;     {[<pred $ $> [string (list term)]
 ;        {[<Pred $p $a> {[p a]}]
 ;         [_ {}]}]
-;      [<eq $ $> [term term]
-;        {[<Eq $l $r> {[l r]}]
+;      [<equation $ $> [term term]
+;        {[<Equation $l $r> {[l r]}]
 ;         [_ {}]}]
 ;      ; 要りそう
 ;      [<unify ,$t $> something
@@ -40,7 +40,8 @@
       {[<cons $x $xs>
         <Compound x xs>]})))
 
-(define $eql (lambda [$x $y] <Eq x y>))
+(define $eql (lambda [$x $y] <Equation x y>))
+; (define $eql (lambda [$x $y] (app "=" x y)))
 
 (define $var
   (lambda $n
@@ -50,8 +51,9 @@
   (pattern-function [$v]
     (| <var v>
        <compound _ <join _ <cons (occur v) _>>>
-       <eq (occur v) _>
-       <eq _ (occur v)>)))
+       <equation (occur v) _>
+       <equation _ (occur v)>
+       )))
 
 (define $fv
   (match-all-lambda term
@@ -66,8 +68,8 @@
             [_ <Var n>]})]       ; なければそのまま
        [<compound $f $xs>
          <Compound f (map (lambda $x (subst u x)) xs)>]
-       [<eq $l $r>
-         <Eq (subst u l) (subst u r)>]})))
+       [<equation $l $r>
+         <Equation (subst u l) (subst u r)>]})))
 
 ; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
 (define $unify
@@ -86,11 +88,11 @@
                 (list something)
           {[,{} {}] ; 失敗
            [<cons $u2 <nil>> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
-     [<pair <eq $xl $xr> <eq $yl $yr>>
+     [<pair <equation $xl $xr> <equation $yl $yr>>
       (match (unify xl yl) (list something)
-       {[,{} {}] ; unifyがすでに失敗している
-        [<cons $u1 <nil>> ; unifiableな場合、単一化子u1をsingletonから取り出す
-         (match (unify xr yr) (list something)
+       {[,{} {}]
+        [<cons $u1 <nil>>
+         (match (unify (subst u1 xr) (subst u1 yr)) (list something)
           {[,{} {}]
            [<cons $u2 <nil>> {@u1 @u2}]})]})]
      [_ {}]}))

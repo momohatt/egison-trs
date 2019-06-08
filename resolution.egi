@@ -13,7 +13,7 @@
        [_ {}]}]
      ; 等式
      [<equation $ $> [term term]
-      {[<Equation $l $r> {[l r]}] ; unordered-pairのように
+      {[<Equation $l $r> {[l r] [r l]}] ; unordered-pairのように
        [_ {}]}]
      [<unify ,$t $> something
       {[$s (unify t s)]}]
@@ -41,7 +41,6 @@
         <Compound x xs>]})))
 
 (define $eql (lambda [$x $y] <Equation x y>))
-; (define $eql (lambda [$x $y] (app "=" x y)))
 
 (define $var
   (lambda $n
@@ -52,12 +51,15 @@
     (| <var v>
        <compound _ <join _ <cons (occur v) _>>>
        <equation (occur v) _>
-       <equation _ (occur v)>
        )))
 
 (define $fv
   (match-all-lambda term
     {[(occur $v) v]}))
+
+(assert-equal "fv-eq"
+  (fv (eql (var x) (var y)))
+  {(var x) (var y)})
 
 (define $subst
   (lambda [$u $t]
@@ -126,6 +128,13 @@
       ;      (return {@(subst-clause sigma xs) @(subst-clause sigma ys)}
       ;      )))
      ]}))
+
+; objective
+(assert-equal "resolution-eq"
+  (resolution
+    {{<Lit -1 (eql (var x) (var y))> <Lit 1 (var y)>}
+     {<Lit 1  (eql (app "+" one two) three)>}})
+  {{<Lit 1 three>} {<Lit 1 (app "+" one two)>}})
 
 ; positive resolution
 (define $presolution

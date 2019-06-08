@@ -29,16 +29,16 @@
 
 ; [z / x, x / y] P(g(x), y) = P(g(z), x)
 (assert-equal "subst1"
-  (subst-prop {[y <Var x>] [x <Var z>]} t1)
+  (psubst {[y <Var x>] [x <Var z>]} t1)
   (pred "P" (app "g" (var z) (var x))))
 
 ; [z / z] P(g(x), y) = P(g(x), y)
 (assert-equal "subst2"
-  (subst-prop {[z <Var z>]} t1)
+  (psubst {[z <Var z>]} t1)
   (pred "P" (app "g" (var x)) (var y)))
 
 (assert-equal "subst3"
-  (subst-prop {[y <Var x>] [x <Var z>]}
+  (psubst {[y <Var x>] [x <Var z>]}
     (eql (app "f" (var x)) (app "+" (var y) (var x))))
   (eql (app "f" (var z)) (app "+" (var x) (var z))))
 
@@ -66,10 +66,6 @@
 ; (\lnot P(g(x),y) \lor P(x,f(x,y))) \land \lnot P(c,y) \land P(g(g(c)),c)
 (define $p1 {{<Lit -1 t1> <Lit 1 t3>} {<Lit -1 t4>} {<Lit 1 t2>}})
 
-(assert-equal "solve1"
-  (solve p1)
-  <REFUTE>)
-
 ; Drinker's paradox
 ; 1. \lnot \exists x. D(x) \to \forall y. D(y)
 ; 2. \forall x. \exists y. D(x) \land \lnot D(y)
@@ -77,10 +73,6 @@
 ; 4. D(x) \land \lnot D(c)
 (define $p2
   {{<Lit 1 (pred "D" (var x))>} {<Lit -1 (pred "D" (app "c"))>}})
-
-(assert-equal "solve2"
-  (solve p2)
-  <REFUTE>)
 
 ; Recall the axioms of groups:
 ; (1) (x*y)*z = x*(y*z)
@@ -146,8 +138,6 @@
    ; (negation of) the goal: x^-1 * x = e
    {<Lit -1 (eql (p (i e2) e2) e)>}})
 
-(assert-equal "solve4" (solve p4) <REFUTE>)
-
 ; ==============================================================================
 
 (define $p5
@@ -168,18 +158,7 @@
    {<Lit -1 (pred "L" (app "h") (var z))> <Lit -1 (pred "F" (app "j") (var z))>}
   })
 
-(assert-equal "solve5"
-  (solve problem)
-  <REFUTE>)
-
 (define $p6
-  {{<Lit 1 (pred "girl" (app "c"))>}
-   {<Lit -1 (pred "boy" (var x))> <Lit 1 (pred "like" (var x) (app "c"))>}
-   {<Lit 1 (pred "boy" (app "d"))>}
-   {<Lit -1 (pred "girl" (var y))> <Lit -1 (pred "lile" (app "d") (var y))>}
-  })
-
-(define $p7
    ; Kate is a girl
   {{<Lit 1 (pred "G" (app "k"))>}
    ; Joe's friends are all tall
@@ -191,6 +170,8 @@
 
    ; question: does Harry love any of Joe's friends? If he does, who does he love?
    {<Lit -1 (pred "L" (app "h") (var z))> <Lit -1 (pred "F" (app "j") (var z))>}})
+
+; ==============================================================================
 
 (define $axioms-of-nat
    ; O + x = x
@@ -205,13 +186,13 @@
 (define $three (app "S" (app "S" (app "S" (app "O")))))
 (define $four  (app "S" (app "S" (app "S" (app "S" (app "O"))))))
 
-(define $p8
+(define $p7
   {@axioms-of-equality
    @axioms-of-nat
    ; S(O) + S(S(O)) = S(S(S(O)))
    {<Lit -1 (eql (app "+" one two) three)>}})
 
-(define $p9
+(define $p8
   {@axioms-of-equality
    @axioms-of-nat
    ; O + S(S(O)) = S(S(O))

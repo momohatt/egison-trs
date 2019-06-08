@@ -24,9 +24,11 @@
       {[<Equation $l $r> {[l r] [r l]}] ; unordered-pairのように
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (unify-prop t s)]}]
+      {[$s (punify t s)]}]
      [$ something
        {[$tgt {tgt}]}]}))
+
+(define $var (lambda $n <Var n>))
 
 (define $app
   (cambda $xs
@@ -42,10 +44,6 @@
 
 (define $eql (lambda [$x $y] <Equation x y>))
 
-(define $var
-  (lambda $n
-    <Var n>))
-
 (define $occur
   (pattern-function [$v]
     (| <var v>
@@ -56,29 +54,29 @@
   (match-all-lambda term
     {[(occur $v) v]}))
 
-(define $subst-term
+(define $tsubst
   (match-lambda [something term]
     {[[$u <var $n>]
        (match u (multiset [integer term])
          {[<cons [,n $t] _> t] ; subst規則があればsubst
           [_ <Var n>]})]       ; なければそのまま
      [[$u <compound $f $xs>]
-       <Compound f (map (lambda $x (subst-term u x)) xs)>]}))
+       <Compound f (map (lambda $x (tsubst u x)) xs)>]}))
 
-(define $subst-prop
+(define $psubst
   (match-lambda [something prop]
     {[[$u <pred $p $xs>]
-       <Pred p (map (lambda $x (subst-term u x)) xs)>]
+       <Pred p (map (lambda $x (tsubst u x)) xs)>]
      [[$u <equation $l $r>]
-       <Equation (subst-term u l) (subst-term u r)>]}))
+       <Equation (tsubst u l) (tsubst u r)>]}))
 
-(define $subst-clause
+(define $csubst
   (match-all-lambda [something (multiset literal)]
     {[[$u <cons <lit $p $t> _>]
-      <Lit p (subst-prop u t)>]}))
+      <Lit p (psubst u t)>]}))
 
-(assert-equal "subst-clause"
-  (subst-clause {[y <Var x>] [x <Var z>]} {<Lit 1 (eql (var x) (var y))>})
+(assert-equal "csubst"
+  (csubst {[y <Var x>] [x <Var z>]} {<Lit 1 (eql (var x) (var y))>})
   {<Lit 1 (var z) (var x)>})
 
 ; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
@@ -94,13 +92,13 @@
       (match (unify x y) (list something)
        {[,{} {}] ; unifyがすでに失敗している
         [<cons $u1 <nil>> ; unifiableな場合、単一化子をsingletonから取り出す
-         (match (unify (subst-term u1 <Compound f xs>) (subst-term u1 <Compound f ys>))
+         (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
                 (list something)
           {[,{} {}] ; 失敗
            [<cons $u2 <nil>> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
      [_ {}]}))
 
-(define $unify-prop
+(define $punify
   (match-lambda (unordered-pair prop)
     {[<pair <pred $p <nil>> <pred ,p <nil>>>
       {{}}]
@@ -108,7 +106,7 @@
       (match (unify x y) (list something)
        {[,{} {}]
         [<cons $u1 <nil>>
-         (match (unify (subst-term u1 <Compound f xs>) (subst-term u1 <Compound f ys>))
+         (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
                 (list something)
           {[,{} {}] ; 失敗
            [<cons $u2 <nil>> {{@u1 @u2}}]})]})]
@@ -143,20 +141,20 @@
     {[<cons <cons <lit ,1 $t> $xs>
        <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
          _>>
-      {@(subst-clause sigma xs) @(subst-clause sigma ys)}]
+      {@(csubst sigma xs) @(csubst sigma ys)}]
      ; [<cons <cons <lit ,1 $t> $xs>
      ;   <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
      ;     _>>
-     ;  {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+     ;  {@(csubst sigma xs) @(csubst sigma ys)}
      ; ]
      }))
 
 ; (io (do
 ;   {[(print (append-strings {(show-term t) " & ~" (show-term s)}))]
 ;    [(print (show sigma))]
-;    [(print (show-clause {@(subst-clause sigma xs) @(subst-clause sigma ys)}))]
+;    [(print (show-clause {@(csubst sigma xs) @(csubst sigma ys)}))]
 ;   }
-;   (return {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+;   (return {@(csubst sigma xs) @(csubst sigma ys)}
 ;   )))
 
 ; objective
@@ -174,7 +172,7 @@
         <cons
           <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
             _>>
-       {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+       {@(csubst sigma xs) @(csubst sigma ys)}
      ]}))
 
 ; 束縛変数の名前が各節で異なるようにする
@@ -186,7 +184,7 @@
       (let {[$u (zip (fv-clause c)
                      ; n, n+1, ... の新しいvarを生成
                      (map (lambda $x <Var x>) (from n)))]}
-        (cons (subst-clause u c)
+        (cons (csubst u c)
               (rename-problem (+ n (length u)) cs)))]}))
 
 (define $trivial?

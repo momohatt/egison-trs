@@ -5,9 +5,9 @@
 (define $z 2)
 (define $w 3)
 ; P(g(x), y)
-(define $t1 (app "P" (app "g" (var x)) (var y)))
+(define $t1 (pred "P" (app "g" (var x)) (var y)))
 ; P(g(g(c)), c)
-(define $t2 (app "P" (app "g" (app "g" (app "c"))) (app "c")))
+(define $t2 (pred "P" (app "g" (app "g" (app "c"))) (app "c")))
 
 (define $test-occur
   (lambda [$v $t]
@@ -29,16 +29,16 @@
 
 ; [z / x, x / y] P(g(x), y) = P(g(z), x)
 (assert-equal "subst1"
-  (subst {[y <Var x>] [x <Var z>]} t1)
-  (app "P" (app "g" (var z) (var x))))
+  (subst-prop {[y <Var x>] [x <Var z>]} t1)
+  (pred "P" (app "g" (var z) (var x))))
 
 ; [z / z] P(g(x), y) = P(g(x), y)
 (assert-equal "subst2"
-  (subst {[z <Var z>]} t1)
-  (app "P" (app "g" (var x)) (var y)))
+  (subst-prop {[z <Var z>]} t1)
+  (pred "P" (app "g" (var x)) (var y)))
 
 (assert-equal "subst3"
-  (subst {[y <Var x>] [x <Var z>]}
+  (subst-prop {[y <Var x>] [x <Var z>]}
     (eql (app "f" (var x)) (app "+" (var y) (var x))))
   (eql (app "f" (var z)) (app "+" (var x) (var z))))
 
@@ -47,13 +47,12 @@
 (assert-equal "unify1" (unify (var x) (var x)) {{}})
 (assert-equal "unify2" (unify t1 (var z)) {{[z t1]}})
 ; {[x, g(c)], [y, c]}
-(assert-equal "unify3" (unify t1 t2) {{[0 <Compound "g" {<Compound "c" {}>}>] [1 <Compound "c" {}>]}})
-(assert-equal "unify4" (unify (var x) t1) {})
+(assert-equal "unify3" (unify-prop t1 t2) {{[0 <Compound "g" {<Compound "c" {}>}>] [1 <Compound "c" {}>]}})
 
 ; ========================= example (group theory) =============================
 
-(define $t3 (app "P" (var x) (app "f" (var x) (var y))))
-(define $t4 (app "P" (app "c") (var y)))
+(define $t3 (pred "P" (var x) (app "f" (var x) (var y))))
+(define $t4 (pred "P" (app "c") (var y)))
 
 ; 1. Problem:
 ; (\forall x y. \exists z. P(g(x),y) \to P(x,z))
@@ -77,7 +76,7 @@
 ; 3. \forall x. D(x) \land \lnot D(c)
 ; 4. D(x) \land \lnot D(c)
 (define $p2
-  {{<Lit 1 (app "D" (var x))>} {<Lit -1 (app "D" (app "c"))>}})
+  {{<Lit 1 (pred "D" (var x))>} {<Lit -1 (pred "D" (app "c"))>}})
 
 (assert-equal "solve2"
   (solve p2)
@@ -153,20 +152,20 @@
 
 (define $p5
   ; Issac is a boy
-  {{<Lit 1 (app "B" (app "i"))>}
+  {{<Lit 1 (pred "B" (app "i"))>}
    ; Kate is a girl
-   {<Lit 1 (app "G" (app "k"))>}
+   {<Lit 1 (pred "G" (app "k"))>}
    ; Joe's friends are all tall
-   {<Lit -1 (app "F" (app "j") (var x))> <Lit 1 (app "T" (var x))>}
+   {<Lit -1 (pred "F" (app "j") (var x))> <Lit 1 (pred "T" (var x))>}
    ; Harry loves any girl that is tall
-   {<Lit -1 (app "G" (var y))> <Lit -1 (app "T" (var y))> <Lit 1 (app "L" (app "h") (var y))>}
+   {<Lit -1 (pred "G" (var y))> <Lit -1 (pred "T" (var y))> <Lit 1 (pred "L" (app "h") (var y))>}
    ; Issac is a friend of Joe
-   {<Lit 1 (app "F" (app "j") (app "i"))>}
+   {<Lit 1 (pred "F" (app "j") (app "i"))>}
    ; Kate is a friend of Joe
-   {<Lit 1 (app "F" (app "j") (app "k"))>}
+   {<Lit 1 (pred "F" (app "j") (app "k"))>}
 
    ; question: does Harry love any of Joe's friends? If he does, who does he love?
-   {<Lit -1 (app "L" (app "h") (var z))> <Lit -1 (app "F" (app "j") (var z))>}
+   {<Lit -1 (pred "L" (app "h") (var z))> <Lit -1 (pred "F" (app "j") (var z))>}
   })
 
 (assert-equal "solve5"
@@ -174,24 +173,24 @@
   <REFUTE>)
 
 (define $p6
-  {{<Lit 1 (app "girl" (app "c"))>}
-   {<Lit -1 (app "boy" (var x))> <Lit 1 (app "like" (var x) (app "c"))>}
-   {<Lit 1 (app "boy" (app "d"))>}
-   {<Lit -1 (app "girl" (var y))> <Lit -1 (app "lile" (app "d") (var y))>}
+  {{<Lit 1 (pred "girl" (app "c"))>}
+   {<Lit -1 (pred "boy" (var x))> <Lit 1 (pred "like" (var x) (app "c"))>}
+   {<Lit 1 (pred "boy" (app "d"))>}
+   {<Lit -1 (pred "girl" (var y))> <Lit -1 (pred "lile" (app "d") (var y))>}
   })
 
 (define $p7
    ; Kate is a girl
-  {{<Lit 1 (app "G" (app "k"))>}
+  {{<Lit 1 (pred "G" (app "k"))>}
    ; Joe's friends are all tall
-   {<Lit -1 (app "F" (app "j") (var x))> <Lit 1 (app "T" (var x))>}
+   {<Lit -1 (pred "F" (app "j") (var x))> <Lit 1 (pred "T" (var x))>}
    ; Harry loves any girl that is tall
-   {<Lit -1 (app "G" (var y))> <Lit -1 (app "T" (var y))> <Lit 1 (app "L" (app "h") (var y))>}
+   {<Lit -1 (pred "G" (var y))> <Lit -1 (pred "T" (var y))> <Lit 1 (pred "L" (app "h") (var y))>}
    ; Kate is a friend of Joe
-   {<Lit 1 (app "F" (app "j") (app "k"))>}
+   {<Lit 1 (pred "F" (app "j") (app "k"))>}
 
    ; question: does Harry love any of Joe's friends? If he does, who does he love?
-   {<Lit -1 (app "L" (app "h") (var z))> <Lit -1 (app "F" (app "j") (var z))>}})
+   {<Lit -1 (pred "L" (app "h") (var z))> <Lit -1 (pred "F" (app "j") (var z))>}})
 
 (define $axioms-of-nat
    ; O + x = x

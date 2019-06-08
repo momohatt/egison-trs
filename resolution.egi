@@ -7,38 +7,38 @@
     {[<var $> integer
       {[<Var $i> {i}]
        [_ {}]}]
-     ; 関数適用または述語適用
+     ; 関数適用
      [<compound $ $> [string (list term)]
       {[<Compound $s $l> {[s l]}]
        [_ {}]}]
-     ; 等式
+     [$ something
+      {[$tgt {tgt}]}]}))
+
+(define $prop
+  (matcher
+     ; 述語
+    {[<pred $ $> [string (list term)]
+       {[<Pred $p $a> {[p a]}]
+        [_ {}]}]
      [<equation $ $> [term term]
       {[<Equation $l $r> {[l r] [r l]}] ; unordered-pairのように
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (unify t s)]}]
+      {[$s (unify-prop t s)]}]
      [$ something
-      {[$tgt {tgt}]}]}))
-
-; (define $prop
-;   (matcher
-;     {[<pred $ $> [string (list term)]
-;        {[<Pred $p $a> {[p a]}]
-;         [_ {}]}]
-;      [<equation $ $> [term term]
-;        {[<Equation $l $r> {[l r]}]
-;         [_ {}]}]
-;      ; 要りそう
-;      [<unify ,$t $> something
-;        {[$s (unify t s)]}]
-;      [$ something
-;        {[$tgt {tgt}]}]}))
+       {[$tgt {tgt}]}]}))
 
 (define $app
   (cambda $xs
     (match xs (list something)
       {[<cons $x $xs>
         <Compound x xs>]})))
+
+(define $pred
+  (cambda $xs
+    (match xs (list something)
+      {[<cons $x $xs>
+        <Pred x xs>]})))
 
 (define $eql (lambda [$x $y] <Equation x y>))
 
@@ -50,28 +50,36 @@
   (pattern-function [$v]
     (| <var v>
        <compound _ <join _ <cons (occur v) _>>>
-       <equation (occur v) _>
        )))
 
 (define $fv
   (match-all-lambda term
     {[(occur $v) v]}))
 
-(assert-equal "fv-eq"
-  (fv (eql (var x) (var y)))
-  {(var x) (var y)})
+(define $subst-term
+  (match-lambda [something term]
+    {[[$u <var $n>]
+       (match u (multiset [integer term])
+         {[<cons [,n $t] _> t] ; subst規則があればsubst
+          [_ <Var n>]})]       ; なければそのまま
+     [[$u <compound $f $xs>]
+       <Compound f (map (lambda $x (subst-term u x)) xs)>]}))
 
-(define $subst
-  (lambda [$u $t]
-    (match t term
-      {[<var $n>
-         (match u (multiset [integer term])
-           {[<cons [,n $t] _> t] ; subst規則があればsubst
-            [_ <Var n>]})]       ; なければそのまま
-       [<compound $f $xs>
-         <Compound f (map (lambda $x (subst u x)) xs)>]
-       [<equation $l $r>
-         <Equation (subst u l) (subst u r)>]})))
+(define $subst-prop
+  (match-lambda [something prop]
+    {[[$u <pred $p $xs>]
+       <Pred p (map (lambda $x (subst-term u x)) xs)>]
+     [[$u <equation $l $r>]
+       <Equation (subst-term u l) (subst-term u r)>]}))
+
+(define $subst-clause
+  (match-all-lambda [something (multiset literal)]
+    {[[$u <cons <lit $p $t> _>]
+      <Lit p (subst-prop u t)>]}))
+
+(assert-equal "subst-clause"
+  (subst-clause {[y <Var x>] [x <Var z>]} {<Lit 1 (eql (var x) (var y))>})
+  {<Lit 1 (var z) (var x)>})
 
 ; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
 (define $unify
@@ -86,48 +94,70 @@
       (match (unify x y) (list something)
        {[,{} {}] ; unifyがすでに失敗している
         [<cons $u1 <nil>> ; unifiableな場合、単一化子をsingletonから取り出す
-         (match (unify (subst u1 <Compound f xs>) (subst u1 <Compound f ys>))
+         (match (unify (subst-term u1 <Compound f xs>) (subst-term u1 <Compound f ys>))
                 (list something)
           {[,{} {}] ; 失敗
            [<cons $u2 <nil>> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
-     [<pair <equation $xl $xr> <equation $yl $yr>>
-      (match (unify xl yl) (list something)
+     [_ {}]}))
+
+(define $unify-prop
+  (match-lambda (unordered-pair prop)
+    {[<pair <pred $p <nil>> <pred ,p <nil>>>
+      {{}}]
+     [<pair <pred $p <cons $x $xs>> <pred ,p <cons $y $ys>>>
+      (match (unify x y) (list something)
        {[,{} {}]
         [<cons $u1 <nil>>
-         (match (unify (subst u1 xr) (subst u1 yr)) (list something)
-          {[,{} {}]
+         (match (unify (subst-term u1 <Compound f xs>) (subst-term u1 <Compound f ys>))
+                (list something)
+          {[,{} {}] ; 失敗
            [<cons $u2 <nil>> {{@u1 @u2}}]})]})]
-     [_ {}]}))
+     ; [<pair <equation $xl $xr> <equation $yl $yr>>
+     ;  (match (unify xl yl) (list something)
+     ;   {[,{} {}]
+     ;    [<cons $u1 <nil>>
+     ;     (match (unify (subst u1 xr) (subst u1 yr)) (list something)
+     ;      {[,{} {}]
+     ;       [<cons $u2 <nil>> {{@u1 @u2}}]})]})]
+    }))
 
 (define $literal
   (algebraic-data-matcher
     ; intergerは1ならそのまま、-1ならnegateされる
-    {<lit integer term>}))
+    {<lit integer prop>}))
 
 (define $fv-clause
   (lambda [$x]
     (unique (match-all x (multiset literal)
-      [<cons <lit _ (occur $v)> _> v]))))
+             {[<cons <lit _ <pred _
+                              <join _ <cons (occur $v) _>>>> _> v]
+              [<cons <lit _ <equation (occur $v) _>> _> v]}))))
 
-(define $subst-clause
-  (match-all-lambda [something (multiset literal)]
-    {[[$u <cons <lit $p $t> _>]
-      <Lit p (subst u t)>]}))
+(assert-equal "fv-clause-eq"
+  (fv-clause {<Lit 1 (eql (var x) (var y))> <Lit 1 (pred "P" (var z) (var w))>})
+  {(var x) (var y) (var z) (var w)})
 
 (define $resolution
   (match-all-lambda (multiset (multiset literal))
+     ; predicateはこっちでマッチ
     {[<cons <cons <lit ,1 $t> $xs>
        <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
          _>>
-      {@(subst-clause sigma xs) @(subst-clause sigma ys)}
-      ; (io (do
-      ;      {[(print (concat-strings {(show-term t) " & ~" (show-term s)} ""))]
-      ;       [(print (show sigma))]
-      ;       [(print (show-clause {@(subst-clause sigma xs) @(subst-clause sigma ys)}))]
-      ;      }
-      ;      (return {@(subst-clause sigma xs) @(subst-clause sigma ys)}
-      ;      )))
-     ]}))
+      {@(subst-clause sigma xs) @(subst-clause sigma ys)}]
+     ; [<cons <cons <lit ,1 $t> $xs>
+     ;   <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
+     ;     _>>
+     ;  {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+     ; ]
+     }))
+
+; (io (do
+;   {[(print (append-strings {(show-term t) " & ~" (show-term s)}))]
+;    [(print (show sigma))]
+;    [(print (show-clause {@(subst-clause sigma xs) @(subst-clause sigma ys)}))]
+;   }
+;   (return {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+;   )))
 
 ; objective
 (assert-equal "resolution-eq"
@@ -145,13 +175,6 @@
           <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
             _>>
        {@(subst-clause sigma xs) @(subst-clause sigma ys)}
-      ; (io (do
-      ;      {[(print (concat-strings {(show-term t) " & ~" (show-term s)} ""))]
-      ;       [(print (show sigma))]
-      ;       [(print (show-clause {@(subst-clause sigma xs) @(subst-clause sigma ys)}))]
-      ;      }
-      ;      (return {@(subst-clause sigma xs) @(subst-clause sigma ys)}
-      ;      )))
      ]}))
 
 ; 束縛変数の名前が各節で異なるようにする
@@ -176,10 +199,6 @@
 (define $filter-clause
   (lambda [$clss]
     (filter (lambda [$cls] (not (trivial? cls))) clss)))
-
-(define $unique
-  (match-all-lambda (list eq)
-    [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
 
 (define $unique-clause
   (match-all-lambda (list (multiset eq))

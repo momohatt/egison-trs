@@ -11,6 +11,8 @@
      [<compound $ $> [string (list term)]
       {[<Compound $s $l> {[s l]}]
        [_ {}]}]
+     [<unify ,$t $> something
+      {[$s (unify t s)]}]
      [$ something
       {[$tgt {tgt}]}]}))
 
@@ -25,8 +27,27 @@
        [_ {}]}]
      [<unify ,$t $> something
       {[$s (punify t s)]}]
+     [<subterm $> term
+      {[$s (psubterm s)]}]
      [$ something
        {[$tgt {tgt}]}]}))
+
+;; term -> {term}
+(define $subterm
+  (lambda [$t]
+    (concat
+      (match-all t term
+        {[<compound _ $xs> {@xs @(concat (map subterm xs))}]
+         [_ {t}] ; var
+        }))))
+
+(define $psubterm
+  (lambda [$p]
+    (unique (concat
+      (match-all p prop
+        {[<pred _ <join _ <cons $x _>>> (subterm x)]
+         [<equation $l $r> {@(subterm l) @(subterm r)}]
+        })))))
 
 (define $var (lambda $n <Var n>))
 
@@ -75,6 +96,23 @@
     {[[$u <cons <lit $p $t> _>]
       <Lit p (psubst u t)>]}))
 
+(define $replace-term
+  (lambda [$s $t $tm]
+    (match tm term
+      {[,s t]
+       [<var _> tm]
+       [<compound $f $xs>
+          <Compound f (map (lambda [$x] (replace-term s t x)) xs)>]
+      })))
+
+; (term, term) -> prop -> prop
+(define $replace
+  (lambda [$s $t $p]
+    (match p prop
+      {[<pred $f $xs> <Pred f (map (lambda [$x] (replace-term s t x)) xs)>]
+       [<equation $l $r> <Equation (replace-term s t l) (replace-term s t r)>]
+       })))
+
 (assert-equal "csubst"
   (csubst {[y <Var x>] [x <Var z>]} {<Lit 1 (eql (var x) (var y))>})
   {<Lit 1 (var z) (var x)>})
@@ -110,6 +148,7 @@
                 (list something)
           {[,{} {}] ; 失敗
            [<cons $u2 <nil>> {{@u1 @u2}}]})]})]
+     [_ {}]
      ; [<pair <equation $xl $xr> <equation $yl $yr>>
      ;  (match (unify xl yl) (list something)
      ;   {[,{} {}]
@@ -137,16 +176,27 @@
 
 (define $resolution
   (match-all-lambda (multiset (multiset literal))
-     ; predicateはこっちでマッチ
-    {[<cons <cons <lit ,1 $t> $xs>
+     ; match equation
+     ; TODO: finish as soon as we found an empty clause
+    {[<cons <cons <lit ,-1 <equation $s ,s>> _> _> {}]
+     [<cons <cons <lit ,1 <equation $s $t>> $xs>
+       <cons <cons <lit $not (& <subterm (& <unify ,s $sigma> $s')> $p)> $ys>
+         _>>
+      ; (io (do
+      ;   {[(print (append-strings
+      ;         {(show-term s') " <- " (show-term s) " = " (show-term t)}))]
+      ;    [(print (show-prop p))]
+      ;    ; [(print (show sigma))]
+      ;    [(print (show-clause (csubst sigma {@xs @ys <Lit not p>})))]
+      ;   }))
+      (csubst sigma {@xs @ys <Lit not (replace s' t p)>})
+     ]
+     ; match predicate
+     [<cons <cons <lit ,1 $t> $xs>
        <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
          _>>
-      {@(csubst sigma xs) @(csubst sigma ys)}]
-     ; [<cons <cons <lit ,1 $t> $xs>
-     ;   <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
-     ;     _>>
-     ;  {@(csubst sigma xs) @(csubst sigma ys)}
-     ; ]
+      (csubst sigma {@xs @ys})
+     ]
      }))
 
 ; (io (do
@@ -167,12 +217,18 @@
 ; positive resolution
 (define $presolution
   (match-all-lambda (multiset (multiset literal))
-    {[<cons
+     ; match equation
+    {[<cons <cons <lit ,-1 <equation $s ,s>> _> _> {}]
+     [<cons <cons <lit ,1 <equation $s $t>> $xs>
+       <cons <cons <lit $not (& <subterm (& <unify ,s $sigma> $s')> $p)> $ys>
+         _>>
+      (csubst sigma {@xs @ys <Lit not (replace s' t p)>})]
+     [<cons
         (& !<cons <lit ,-1 _> _> <cons <lit ,1 $t> $xs>)
         <cons
           <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
             _>>
-       {@(csubst sigma xs) @(csubst sigma ys)}
+       (csubst sigma {@xs @ys})
      ]}))
 
 ; 束縛変数の名前が各節で異なるようにする

@@ -121,8 +121,8 @@
 ; (1) (2) (4) |= (5)
 (define $p3
   {@axioms-of-groups
-   @axioms-of-equality
-   @congruence-groups
+   ; @axioms-of-equality
+   ; @congruence-groups
 
    ; (negation of) the goal: e * x = x
    {<Lit -1 (eql (p e e1) e1)>}})
@@ -132,8 +132,8 @@
 ; (1) (2) (4) |= (3)
 (define $p4
   {@axioms-of-groups
-   @axioms-of-equality
-   @congruence-groups
+   ; @axioms-of-equality
+   ; @congruence-groups
 
    ; (negation of) the goal: x^-1 * x = e
    {<Lit -1 (eql (p (i e2) e2) e)>}})
@@ -187,13 +187,16 @@
 (define $four  (app "S" (app "S" (app "S" (app "S" (app "O"))))))
 
 (define $p7
-  {@axioms-of-equality
+  {; @axioms-of-equality
    @axioms-of-nat
    ; S(O) + S(S(O)) = S(S(S(O)))
    {<Lit -1 (eql (app "+" one two) three)>}})
 
 (define $p8
-  {@axioms-of-equality
+  {; @axioms-of-equality
    @axioms-of-nat
    ; O + S(S(O)) = S(S(O))
    {<Lit -1 (eql (app "+" zero two) two)>}})
+
+(define $p9
+  {{<Lit -1 (eql (var x) (var x))>}})

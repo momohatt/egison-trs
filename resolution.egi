@@ -94,7 +94,7 @@
         [<cons $u1 <nil>>
          (match (unify (subst u1 xr) (subst u1 yr)) (list something)
           {[,{} {}]
-           [<cons $u2 <nil>> {@u1 @u2}]})]})]
+           [<cons $u2 <nil>> {{@u1 @u2}}]})]})]
      [_ {}]}))
 
 (define $literal
@@ -115,19 +115,35 @@
 (define $resolution
   (match-all-lambda (multiset (multiset literal))
     {[<cons <cons <lit ,1 $t> $xs>
-       <cons <cons <lit ,-1 (& <unify ,t $σ> $s)> $ys>
+       <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
          _>>
-      {@(subst-clause σ xs) @(subst-clause σ ys)}]}))
+      {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+      ; (io (do
+      ;      {[(print (concat-strings {(show-term t) " & ~" (show-term s)} ""))]
+      ;       [(print (show sigma))]
+      ;       [(print (show-clause {@(subst-clause sigma xs) @(subst-clause sigma ys)}))]
+      ;      }
+      ;      (return {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+      ;      )))
+     ]}))
 
 ; positive resolution
 (define $presolution
   (match-all-lambda (multiset (multiset literal))
-   {[<cons
-       (& !<cons <lit ,-1 _> _> <cons <lit ,1 $t> $xs>)
-       <cons
-         <cons <lit ,-1 (& <unify ,t $σ> $s)> $ys>
-           _>>
-       {@(subst-clause σ xs) @(subst-clause σ ys)}]}))
+    {[<cons
+        (& !<cons <lit ,-1 _> _> <cons <lit ,1 $t> $xs>)
+        <cons
+          <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
+            _>>
+       {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+      ; (io (do
+      ;      {[(print (concat-strings {(show-term t) " & ~" (show-term s)} ""))]
+      ;       [(print (show sigma))]
+      ;       [(print (show-clause {@(subst-clause sigma xs) @(subst-clause sigma ys)}))]
+      ;      }
+      ;      (return {@(subst-clause sigma xs) @(subst-clause sigma ys)}
+      ;      )))
+     ]}))
 
 ; 束縛変数の名前が各節で異なるようにする
 (define $rename-problem
@@ -156,11 +172,13 @@
   (match-all-lambda (list eq)
     [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
 
+(define $unique-clause
+  (match-all-lambda (list (multiset eq))
+    [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
+
 (define $trim-clause
   (lambda [$clss]
-    (filter-clause
-      (match-all clss (list (multiset eq))
-        [<join _ <cons $z !<join _ <cons ,z _>>>> z]))))
+    (filter-clause (unique-clause clss))))
 
 (define $solve
   (match-lambda (multiset (multiset literal))

@@ -177,9 +177,7 @@
 (define $resolution
   (match-all-lambda (multiset (multiset literal))
      ; match equation
-     ; TODO: finish as soon as we found an empty clause
-    {[<cons <cons <lit ,-1 <equation $s ,s>> _> _> {}]
-     [<cons <cons <lit ,1 <equation $s $t>> $xs>
+    {[<cons <cons <lit ,1 <equation $s $t>> $xs>
        <cons <cons <lit $not (& <subterm (& <unify ,s $sigma> $s')> $p)> $ys>
          _>>
       ; (io (do
@@ -218,8 +216,7 @@
 (define $presolution
   (match-all-lambda (multiset (multiset literal))
      ; match equation
-    {[<cons <cons <lit ,-1 <equation $s ,s>> _> _> {}]
-     [<cons <cons <lit ,1 <equation $s $t>> $xs>
+    {[<cons <cons <lit ,1 <equation $s $t>> $xs>
        <cons <cons <lit $not (& <subterm (& <unify ,s $sigma> $s')> $p)> $ys>
          _>>
       (csubst sigma {@xs @ys <Lit not (replace s' t p)>})]
@@ -264,7 +261,11 @@
 
 (define $solve
   (match-lambda (multiset (multiset literal))
-    {[<cons <nil> _> ; 空節が導出できた
+     ; empty clause
+    {[<cons <nil> _>
+      <REFUTE>]
+     ; non-reflexive equation
+     [<cons <cons <lit ,-1 <equation $s ,s>> _> _>
       <REFUTE>]
      [$p
       (let {[$q (resolution (rename-problem 0 p))]}
@@ -276,7 +277,11 @@
 ; positive closure
 (define $psolve
   (match-lambda (multiset (multiset literal))
-    {[<cons <nil> _> ; 空節が導出できた
+     ; empty clause
+    {[<cons <nil> _>
+      <REFUTE>]
+     ; non-reflexive equation
+     [<cons <cons <lit ,-1 <equation $s ,s>> _> _>
       <REFUTE>]
      [$p
       (let {[$q (presolution (rename-problem 0 p))]}

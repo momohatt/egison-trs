@@ -205,13 +205,6 @@
 ;   (return {@(csubst sigma xs) @(csubst sigma ys)}
 ;   )))
 
-; objective
-(assert-equal "resolution-eq"
-  (resolution
-    {{<Lit -1 (eql (var x) (var y))> <Lit 1 (var y)>}
-     {<Lit 1  (eql (app "+" one two) three)>}})
-  {{<Lit 1 three>} {<Lit 1 (app "+" one two)>}})
-
 ; positive resolution
 (define $presolution
   (match-all-lambda (multiset (multiset literal))

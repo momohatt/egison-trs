@@ -82,8 +82,8 @@
 ; (5) 1*x = x
 ; It is known that (3) and (5) above are redundant, i.e., provable from other axioms. Let's prove this!
 
-(define $p (lambda [$x $y] (app "*" x y))) ; product
-(define $i (lambda $x (app "i" x)))        ; inverse
+(define $p (app "*" $1 $2)) ; product
+(define $i (app "i" $1))    ; inverse
 (define $e (app "e"))
 (define $e1 (app "e1"))
 (define $e2 (app "e2"))

@@ -82,12 +82,12 @@
          {[<cons [,n $t] _> t] ; subst規則があればsubst
           [_ <Var n>]})]       ; なければそのまま
      [[$u <compound $f $xs>]
-       <Compound f (map (lambda $x (tsubst u x)) xs)>]}))
+       <Compound f (map (tsubst u $1) xs)>]}))
 
 (define $psubst
   (match-lambda [something prop]
     {[[$u <pred $p $xs>]
-       <Pred p (map (lambda $x (tsubst u x)) xs)>]
+       <Pred p (map (tsubst u $1) xs)>]
      [[$u <equation $l $r>]
        <Equation (tsubst u l) (tsubst u r)>]}))
 
@@ -102,14 +102,14 @@
       {[,s t]
        [<var _> tm]
        [<compound $f $xs>
-          <Compound f (map (lambda [$x] (replace-term s t x)) xs)>]
+          <Compound f (map (replace-term s t $1) xs)>]
       })))
 
 ; (term, term) -> prop -> prop
 (define $replace
   (lambda [$s $t $p]
     (match p prop
-      {[<pred $f $xs> <Pred f (map (lambda [$x] (replace-term s t x)) xs)>]
+      {[<pred $f $xs> <Pred f (map (replace-term s t $1) xs)>]
        [<equation $l $r> <Equation (replace-term s t l) (replace-term s t r)>]
        })))
 

@@ -179,6 +179,40 @@
   (fv-clause {<Lit 1 (eql (var x) (var y))> <Lit 1 (pred "P" (var z) (var w))>})
   {(var x) (var y) (var z) (var w)})
 
+; assumes that the two input lists have the same length
+(define $lpo?
+  (match-lambda [(list term) (list term)]
+    {[[<nil> <nil>] #f] ; not strictly great
+     [[<cons $s $sx> <cons ,s $tx>]
+        (lpo? sx tx)]
+     [[<cons $s _> <cons ?(succ? s $) _>] #t]
+     [_ #f]}))
+
+(define $terminate?
+  (lambda [$x $ts]
+    (all (succ? x $) ts)))
+
+(define $sigord
+  (match-lambda [string string]
+    {[[,"+" ,"S"] #t]
+     [_ #f]}))
+
+; Lexicographic Path Order
+(define $succ?
+  (lambda [$x $y]
+    (match [x y] [term term]
+      {[(| [<compound $f $ss>
+            <compound ,f
+              (& ?(lpo? ss $) ?(terminate? x $))>]
+           [<compound _ <join _ <cons $s _>>>
+            ,s]
+           [<compound _ <join _ <cons $s _>>>
+            ?(succ? s $)]
+           [<compound $f $ss>
+            <compound ?(sigord f $) ?(terminate? x $)>])
+          #t]
+       [_ #f]})))
+
 (define $resolution
   (match-all-lambda (multiset (multiset literal))
      ; match equation
@@ -186,6 +220,7 @@
        <cons <cons <lit $sign
            (& <subterm (& !<var _> <unify ,s $sigma> $s')> $p)> $ys>
          _>>
+       ; TODO: replaceで大丈夫なのか？(全ての出現を置き換えるわけではない？)
       (csubst sigma {@xs @ys <Lit sign (replace s' t p)>})
      ]
      ; match predicate

@@ -345,21 +345,49 @@
               <equation (& <subterm (& !<var _> <unify ,s $sigma> $s')> $u) $v>>
              $ys>
             _>>
-         ?(reductive? s t xs sigma)
-         ?(neq? (tsubst sigma u) (tsubst sigma v))
-         ?(neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Greater>)
-         ?(maximal-occur? (eql u v) ys sigma))
+         ?(lambda [$z] ; z does not occur
+            (and (reductive? s t xs sigma)
+                 (neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Greater>)
+                 (neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Equal>)
+                 (maximal-occur? (eql u v) ys sigma))))
       (csubst sigma {@xs @ys <Lit -1 (eql (replace-term s' t u) v)>})
      ]
 
      ; superposition right
+     [(& <cons <cons <lit ,1 <equation $s $t>> $xs>
+          <cons <cons <lit ,1
+              <equation (& <subterm (& !<var _> <unify ,s $sigma> $s')> $u) $v>>
+             $ys>
+            _>>
+         ?(lambda [$z] ; z does not occur
+            (and (reductive? s t xs sigma)
+                 (reductive? u v ys sigma))))
+      (csubst sigma {@xs @ys <Lit 1 (eql (replace-term s' t u) v)>})
+     ]
+
+     ; equality resolution
+     [(& <cons <cons <lit ,-1 <equation $u (& <unify ,u $sigma> $v)>> $ys> _>
+         ?(lambda [$z]
+            (maximal-occur? (eql u v) ys sigma)))
+      (csubst sigma ys)
+     ]
+
+     ; equality factoring
+     [(& <cons <cons <lit ,1 <equation $s $t>>
+               <cons <lit ,1 <equation (& <unify ,s $sigma> $s') $t'>> $xs>> _>
+         ?(lambda [$z]
+            (and (neq? (ord-t (tsubst sigma t ) (tsubst sigma s )) <Greater>)
+                 (neq? (ord-t (tsubst sigma t') (tsubst sigma s')) <Greater>)
+                 (maximal-occur? (eql s t) {(eql s' t') @xs} sigma))))
+      (csubst sigma {<Lit -1 (eql t t')> <Lit 1 (eql s' t')> @xs})
+     ]
 
      ; match predicate
-     [<cons <cons <lit ,1 $t> $xs>
-       <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
-         _>>
-      (csubst sigma {@xs @ys})
-     ]
+     ; [<cons <cons <lit ,1 $t> $xs>
+     ;   <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
+     ;     _>>
+     ;  (csubst sigma {@xs @ys})
+     ; ]
      }))
 
 ; positive resolution + paramodulation
@@ -407,33 +435,22 @@
       (& $z !<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>>)
        !<join _ <cons ,z _>> >> z]))
 
-(define $solve
-  (match-lambda (multiset (multiset literal))
-     ; empty clause
-    {[<cons <nil> _>
-      <REFUTE>]
-     ; non-reflexive equation
-     [<cons <cons <lit ,-1 <equation $s ,s>> _> _>
-      <REFUTE>]
-     [$p
-      (let {[$q (resolution (rename-problem 0 p))]}
-        (if (include?/m (multiset literal) p q) ; q \subseteq? p
-          <SATURATED>
-          (let {[$r (trim-clause {@p @q})]}
-            (solve (debug-c r)))))]}))
+(define $make-solve
+  (lambda [$resol]
+   (match-lambda (multiset (multiset literal))
+      ; empty clause
+     {[<cons <nil> _>
+       <REFUTE>]
+      ; non-reflexive equation
+      [<cons <cons <lit ,-1 <equation $s ,s>> _> _>
+       <REFUTE>]
+      [$p
+       (let {[$q (resol (rename-problem 0 p))]}
+         (if (include?/m (multiset literal) p q) ; q \subseteq? p
+           <SATURATED>
+           (let {[$r (trim-clause {@p @q})]}
+             (solve (debug-c r)))))]})))
 
-; positive closure
-(define $psolve
-  (match-lambda (multiset (multiset literal))
-     ; empty clause
-    {[<cons <nil> _>
-      <REFUTE>]
-     ; non-reflexive equation
-     [<cons <cons <lit ,-1 <equation $s ,s>> <nil>> _>
-      <REFUTE>]
-     [$p
-      (let {[$q (sresolution (rename-problem 0 p))]}
-        (if (include?/m (multiset literal) p q) ; q \subseteq? p
-          <SATURATED>
-          (let {[$r (trim-clause {@p @q})]}
-            (psolve (debug-c r)))))]}))
+(define $solve (make-solve resolution))
+(define $psolve (make-solve presolution))
+(define $ssolve (make-solve sresolution))

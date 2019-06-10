@@ -55,6 +55,7 @@
   {(app "+" (var y) (app "*" (var z) (var w))) (app "*" (var z) (var w))})
 
 (define $var (lambda $n <Var n>))
+(define $bottom (var -1))
 
 (define $app
   (cambda $xs
@@ -179,11 +180,12 @@
   (fv-clause {<Lit 1 (eql (var x) (var y))> <Lit 1 (pred "P" (var z) (var w))>})
   {(var x) (var y) (var z) (var w)})
 
+; ================================== LPO =======================================
+
 ; assumes that the two input lists have the same length
 (define $lpo?
   (match-lambda [(list term) (list term)]
-    {[[<nil> <nil>] #f] ; not strictly great
-     [[<cons $s $sx> <cons ,s $tx>]
+    {[[<cons $s $sx> <cons ,s $tx>]
         (lpo? sx tx)]
      [[<cons $s _> <cons ?(succ? s $) _>] #t]
      [_ #f]}))
@@ -198,21 +200,65 @@
      [_ #f]}))
 
 ; Lexicographic Path Order
-(define $succ?
+(define $ord-t
   (lambda [$x $y]
     (match [x y] [term term]
-      {[(| [<compound $f $ss>
+      {[[_ ,x] <Equal>]
+       [[,bottom _] <Less>]
+       [[_ ,bottom] <Greater>]
+       [(| [<compound $f $ss>
             <compound ,f
               (& ?(lpo? ss $) ?(terminate? x $))>]
-           [<compound _ <join _ <cons $s _>>>
-            ,s]
+           [<compound _ <join _ <cons ,y _>>>
+            _]
            [<compound _ <join _ <cons $s _>>>
             ?(succ? s $)]
-           [<compound $f $ss>
+           [<compound $f _>
             <compound ?(sigord f $) ?(terminate? x $)>])
-          #t]
+          <Greater>]
+       [(| [<compound $f
+              (& (later ?(lpo? ss $)) ?(terminate? y $))>
+            <compound ,f $ss>]
+           [_
+            <compound _ <join _ <cons ,x _>>>]
+           [(later ?(succ? s $))
+            <compound _ <join _ <cons $s _>>>]
+           [<compound $f ?(terminate? y $)>
+            <compound ?(sigord $ f) _>])
+          <Less>]
+       [_ <Undefined>]})))
+
+(define $succ?
+  (lambda [$x $y]
+    (match (ord-t x y) ordering
+      {[<greater> #t]
        [_ #f]})))
 
+(define $ord-mul
+  (lambda [$ord]
+    (lambda [$x $y]
+      (compare-c/fn ord (reverse (sort/fn ord x))
+                        (reverse (sort/fn ord y))))))
+
+(define $ord-eq
+  (match-lambda [prop prop]
+    {[[<equation $s $t> <equation $p $q>]
+        ((ord-mul ord-t) {s t} {p q})]}))
+
+(define $convert-lit
+  (match-lambda literal
+    {[<lit ,1  <equation $s $t>> {{s} {t}}]
+     [<lit ,-1 <equation $s $t>> {{s bottom} {t bottom}}]}))
+(define $ord-lit
+  (lambda [$l1 $l2]
+    ((ord-mul (ord-mul ord-t)) (convert-lit l1) (convert-lit l2))))
+
+(define $ord-cls
+  (ord-mul ord-lit))
+
+; =============================== resolution ===================================
+
+; resolution + paramodulation
 (define $resolution
   (match-all-lambda (multiset (multiset literal))
      ; match equation
@@ -231,15 +277,22 @@
      ]
      }))
 
-; (io (do
-;   {[(print (append-strings {(show-term t) " & ~" (show-term s)}))]
-;    [(print (show sigma))]
-;    [(print (show-clause {@(csubst sigma xs) @(csubst sigma ys)}))]
-;   }
-;   (return {@(csubst sigma xs) @(csubst sigma ys)}
-;   )))
+; resolution + superposition
+(define $sresolution
+  (match-all-lambda (multiset (multiset literal))
+    {; superposition left
 
-; positive resolution
+     ; superposition right
+
+     ; match predicate
+     [<cons <cons <lit ,1 $t> $xs>
+       <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
+         _>>
+      (csubst sigma {@xs @ys})
+     ]
+     }))
+
+; positive resolution + paramodulation
 (define $presolution
   (match-all-lambda (multiset (multiset literal))
      ; match equation
@@ -256,6 +309,16 @@
        (csubst sigma {@xs @ys})
      ]}))
 
+; (io (do
+;   {[(print (append-strings {(show-term t) " & ~" (show-term s)}))]
+;    [(print (show sigma))]
+;    [(print (show-clause {@(csubst sigma xs) @(csubst sigma ys)}))]
+;   }
+;   (return {@(csubst sigma xs) @(csubst sigma ys)}
+;   )))
+
+; ==============================================================================
+
 ; 束縛変数の名前が各節で異なるようにする
 (define $rename-problem
   (match-lambda [integer (list (list literal))]
@@ -268,24 +331,10 @@
         (cons (csubst u c)
               (rename-problem (+ n (length u)) cs)))]}))
 
-(define $trivial?
-  (lambda [$cls]
-    (any id
-      (match-all cls (multiset literal)
-        {[<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>> #t]
-         [_ #f]}))))
-
-(define $filter-clause
-  (lambda [$clss]
-    (filter (lambda [$cls] (not (trivial? cls))) clss)))
-
-(define $unique-clause
-  (match-all-lambda (list (multiset eq))
-    [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
-
 (define $trim-clause
-  (lambda [$clss]
-    (filter-clause (unique-clause clss))))
+  (match-all-lambda (list (multiset eq))
+    [<join _ <cons (& $z !<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>>)
+       !<join _ <cons ,z _>>>> z]))
 
 (define $solve
   (match-lambda (multiset (multiset literal))

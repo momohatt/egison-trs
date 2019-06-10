@@ -36,32 +36,27 @@
 
 ;; term -> {term, term -> term}
 (define $subterm
-  (lambda [$t]
-    (unique
-      (match-all t term
-        {[<compound $f <join $xs <cons <subterm $x $env> $xs'>>>
-           (let {[$env' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
-             [x (lambda [$x] (env' (env x)))])]
-         [_ [t id]]
-        }))))
+  (match-all-lambda term
+    {[<compound $f <join $xs <cons <subterm $x $env> $xs'>>>
+       (let {[$env' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
+         [x (compose env' env)])]
+     [$t [t id]]}))
 
 ;; prop -> {term, term -> prop}
 (define $psubterm
-  (lambda [$p]
-    (unique
-      (match-all p prop
-        {[<pred $f <join $xs <cons <subterm $x $env> $xs'>>>
-           [x (lambda [$x] <Pred f (append xs (cons (env x) xs'))>)]]
-         [<equation <subterm $x $env> $r>
-           [x (lambda [$x] <Equation (env x) r>)]]
-        }))))
+  (match-all-lambda p prop
+    {[<pred $f <join $xs <cons <subterm $x $env> $xs'>>>
+       [x (lambda [$x] <Pred f (append xs (cons (env x) xs'))>)]]
+     [<equation <subterm $x $env> $r>
+       [x (lambda [$x] <Equation (env x) r>)]]
+    }))
 
 (assert-equal "subterm"
   ; x = (y + (z * w))
   (match-all (eql (var x) (app "+" (var y) (app "*" (var z) (var w)))) prop
     {[<subterm (& !<var _> $a) $env> [a (env (var 4))]]})
-  {[(app "+" (var y) (app "*" (var z) (var w))) (eql (var x) (var 4))]
-   [(app "*" (var z) (var w)) (eql (var x) (app "+" (var y) (var 4)))]})
+  {[(app "*" (var z) (var w)) (eql (var x) (app "+" (var y) (var 4)))]
+   [(app "+" (var y) (app "*" (var z) (var w))) (eql (var x) (var 4))]})
 
 (define $var (lambda $n <Var n>))
 (define $bottom (var -1))

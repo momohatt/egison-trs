@@ -13,6 +13,7 @@
     breaklines,
     mathescape=true,
     fontsize=\footnotesize,
+    escapeinside=||,
 }
 \renewcommand{\kanjifamilydefault}{\gtdefault}%和文用
 
@@ -104,12 +105,12 @@
   \end{exampleblock}
 
   \begin{block}{}
-    \begin{minted}{racket}
+    \begin{minted}{lisp}
 (define $resolution ; resolventを求める
   (match-all-lambda (multiset (multiset literal))
-    {[<cons <cons <lit ,1 $t> $xs>
+    {[<cons |\colorbox{yellow}{<cons <lit ,1 \$t> \$xs>}|
        ; $t$との最汎単一化子が$\sigma$であるようなリテラル$\lnot s$
-       <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
+       <cons |\colorbox{yellow}{<cons <lit ,-1 (& <unify ,t \$sigma> \$s)> \$ys>}|
          _>>
       {@(subst-clause sigma xs) @(subst-clause sigma ys)}]}))
     \end{minted}
@@ -120,17 +121,17 @@
   \begin{itemize}
     \item 群の公理から群の性質を示す
     \begin{itemize}
-      \item 等式は単なる2項述語なので等式の公理も必要
+      \item 等式は単なる2項述語なので\colorbox{yellow}{等式の公理}も必要
     \end{itemize}
-    \begin{minted}{racket}
+    \begin{minted}{lisp}
 (define $p3
   {@axioms-of-groups
-   @axioms-of-equality
-   @congruence-groups
+   |\colorbox{yellow}{@axioms-of-equality}|
+   |\colorbox{yellow}{@congruence-groups}|
    ; (negation of) the goal: e * x = x
    {<Lit -1 <Compound "=" <Compound "*" {e e1}> e1>>}})
 
-(solve p3) ; => 現実的な時間では終わらない
+> (solve p3) ; => 現実的な時間では終わらない
     \end{minted}
   \end{itemize}
   \begin{block}{目標}
@@ -206,13 +207,86 @@ $S$にreflexivityとfunctional reflexivityを加えたものからparamodulation
   \end{itemize}
 \end{frame}
 
-\begin{frame}{paramodulation / 実装}
+\begin{frame}[fragile]{paramodulation / 実装}
+  \begin{block}{prop}
+    \begin{minted}{lisp}
+; predicateとは別にequationを用意する
+(define $prop
+  (matcher
+    {[<pred $ $> [string (list term)]
+       {[<Pred $p $a> {[p a]}]
+        [_ {}]}]
+     [|\colorbox{yellow}{<equation \$ \$>}| [term term]
+       ; unordered-pairのようにマッチ($l \doteq r$を表現)
+      {[<Equation $l $r> {|\colorbox{yellow}{[l r] [r l]}|}]
+       [_ {}]}]
+     [<unify ,$t $> something
+      {[$s (punify t s)]}]
+     [<subterm $ $> [term something]
+      {[$s (psubterm s)]}]
+     [$ something
+       {[$tgt {tgt}]}]}))
+    \end{minted}
+  \end{block}
+\end{frame}
 
+\begin{frame}[fragile]{paramodulation / 実装}
+  \begin{block}{subterm}
+    \begin{minted}{lisp}
+(define $prop
+  (matcher
+    {(...)
+     ; subtermとその「環境」(term -> propの関数)のペアにマッチ
+     |\colorbox{yellow}{[<subterm \$ \$> [term something]}|
+      |\colorbox{yellow}{{[\$s (psubterm s)]}]}|
+     [$ something
+       {[$tgt {tgt}]}]}))
+    \end{minted}
+  \end{block}
+
+  \begin{block}{}
+    \begin{minted}{lisp}
+;; term -> {term, term -> term}
+(define $subterm
+  (match-all-lambda term
+    {[<compound $f <join $xs <cons <subterm $x $env> $xs'>>>
+       (let {[$env'
+              (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
+         [x (compose env' env)])]
+     [$t [t id]]}))
+    \end{minted}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{paramodulation / 実装}
+  \begin{block}{resolution}
+    \begin{minted}{lisp}
+(define $resolution
+  (match-all-lambda (multiset (multiset literal))
+     ; paramodulation
+    {[<cons <cons <lit ,1 <equation $s $t>> $xs>
+       <cons <cons <lit $sign
+           ; env[s'], s'は変数でない, sigma = mgu(s, s')
+           |\colorbox{yellow}{<subterm (& !<var \_> <unify ,s \$sigma> \$s') \$env>}|> $ys>
+         _>>
+      (csubst sigma {@xs @ys <Lit sign |\colorbox{yellow}{(env t)}|>})
+     ]
+     ; 普通のresolution
+     [<cons <cons <lit ,1 $t> $xs>
+       <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
+         _>>
+      (csubst sigma {@xs @ys})
+     ]}))
+    \end{minted}
+  \end{block}
 \end{frame}
 
 \subsection{実装}
 \section{superposition}
 \subsection{理論}
+\begin{frame}{superposition}
+
+\end{frame}
 
 \subsection{実装}
 

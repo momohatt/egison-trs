@@ -13,7 +13,7 @@
        [_ {}]}]
      [<unify ,$t $> something
       {[$s (unify t s)]}]
-     [<subterm $> term
+     [<subterm $ $> [term something]
       {[$s (subterm s)]}]
      [$ something
       {[$tgt {tgt}]}]}))
@@ -29,32 +29,39 @@
        [_ {}]}]
      [<unify ,$t $> something
       {[$s (punify t s)]}]
-     [<subterm $> term
+     [<subterm $ $> [term something]
       {[$s (psubterm s)]}]
      [$ something
        {[$tgt {tgt}]}]}))
 
-;; term -> {term}
+;; term -> {term, term -> term}
 (define $subterm
   (lambda [$t]
-    (concat
+    (unique
       (match-all t term
-        {[<compound _ $xs> {@xs @(concat (map subterm xs))}]
-         [_ {t}] ; var
+        {[<compound $f <join $xs <cons <subterm $x $env> $xs'>>>
+           (let {[$env' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
+             [x (lambda [$x] (env' (env x)))])]
+         [_ [t id]]
         }))))
 
+;; prop -> {term, term -> prop}
 (define $psubterm
   (lambda [$p]
-    (unique (concat
+    (unique
       (match-all p prop
-        {[<pred _ <join _ <cons $x _>>> (subterm x)]
-         [<equation $l $r> {@(subterm l) @(subterm r)}]
-        })))))
+        {[<pred $f <join $xs <cons <subterm $x $env> $xs'>>>
+           [x (lambda [$x] <Pred f (append xs (cons (env x) xs'))>)]]
+         [<equation <subterm $x $env> $r>
+           [x (lambda [$x] <Equation (env x) r>)]]
+        }))))
 
 (assert-equal "subterm"
+  ; x = (y + (z * w))
   (match-all (eql (var x) (app "+" (var y) (app "*" (var z) (var w)))) prop
-    {[<subterm (& !<var _> $a)> a]})
-  {(app "+" (var y) (app "*" (var z) (var w))) (app "*" (var z) (var w))})
+    {[<subterm (& !<var _> $a) $env> [a (env (var 4))]]})
+  {[(app "+" (var y) (app "*" (var z) (var w))) (eql (var x) (var 4))]
+   [(app "*" (var z) (var w)) (eql (var x) (app "+" (var y) (var 4)))]})
 
 (define $var (lambda $n <Var n>))
 (define $bottom (var -1))
@@ -108,23 +115,6 @@
   (match-all-lambda [something (multiset literal)]
     {[[$u <cons <lit $p $t> _>]
       <Lit p (psubst u t)>]}))
-
-(define $replace-term
-  (lambda [$s $t $tm]
-    (match tm term
-      {[,s t]
-       [<var _> tm]
-       [<compound $f $xs>
-          <Compound f (map (replace-term s t $1) xs)>]
-      })))
-
-; (term, term) -> prop -> prop
-(define $replace
-  (lambda [$s $t $p]
-    (match p prop
-      {[<pred $f $xs> <Pred f (map (replace-term s t $1) xs)>]
-       [<equation $l $r> <Equation (replace-term s t l) (replace-term s t r)>]
-       })))
 
 (assert-equal "csubst"
   (csubst {[y <Var x>] [x <Var z>]} {<Lit 1 (eql (var x) (var y))>})
@@ -333,10 +323,9 @@
      ; match equation
     {[<cons <cons <lit ,1 <equation $s $t>> $xs>
        <cons <cons <lit $sign
-           (& <subterm (& !<var _> <unify ,s $sigma> $s')> $p)> $ys>
+           <subterm (& !<var _> <unify ,s $sigma> $s') $env>> $ys>
          _>>
-       ; TODO: replaceで大丈夫なのか？(全ての出現を置き換えるわけではない？)
-      (csubst sigma {@xs @ys <Lit sign (replace s' t p)>})
+      (csubst sigma {@xs @ys <Lit sign (env t)>})
      ]
      ; match predicate
      [<cons <cons <lit ,1 $t> $xs>
@@ -352,7 +341,7 @@
     {; superposition left
      [(& <cons <cons <lit ,1 <equation $s $t>> $xs>
           <cons <cons <lit ,-1
-              <equation (& <subterm (& !<var _> <unify ,s $sigma> $s')> $u) $v>>
+             <equation (& <subterm (& !<var _> <unify ,s $sigma> $s') $env> $u) $v>>
              $ys>
             _>>
          ?(lambda [$z] ; z does not occur
@@ -360,19 +349,19 @@
                  (neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Greater>)
                  (neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Equal>)
                  (maximal-occur? (eql u v) ys sigma))))
-      (csubst sigma {@xs @ys <Lit -1 (eql (replace-term s' t u) v)>})
+      (csubst sigma {@xs @ys <Lit -1 (eql (env t) v)>})
      ]
 
      ; superposition right
      [(& <cons <cons <lit ,1 <equation $s $t>> $xs>
           <cons <cons <lit ,1
-              <equation (& <subterm (& !<var _> <unify ,s $sigma> $s')> $u) $v>>
+             <equation (& <subterm (& !<var _> <unify ,s $sigma> $s') $env> $u) $v>>
              $ys>
             _>>
          ?(lambda [$z] ; z does not occur
             (and (reductive? s t xs sigma)
                  (reductive? u v ys sigma))))
-      (csubst sigma {@xs @ys <Lit 1 (eql (replace-term s' t u) v)>})
+      (csubst sigma {@xs @ys <Lit 1 (eql (env t) v)>})
      ]
 
      ; equality resolution
@@ -406,9 +395,9 @@
      ; match equation
     {[<cons <cons <lit ,1 <equation $s $t>> $xs>
        <cons <cons <lit $sign
-           (& <subterm (& !<var _> <unify ,s $sigma> $s')> $p)> $ys>
+           (& <subterm (& !<var _> <unify ,s $sigma> $s') $env> $p)> $ys>
          _>>
-      (csubst sigma {@xs @ys <Lit sign (replace s' t p)>})]
+      (csubst sigma {@xs @ys <Lit sign (env t)>})]
      [<cons
         (& !<cons <lit ,-1 _> _> <cons <lit ,1 $t> $xs>)
         <cons
@@ -442,7 +431,8 @@
 (define $trim-clause
   (match-all-lambda (list (multiset literal))
     [<join _ <cons
-      (& $z !<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>>)
+      (& $z !<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>>
+         !<cons <lit ,1 <equation $s ,s>> _>)
        !<join _ <cons ,z _>> >> z]))
 
 (define $make-solve
@@ -459,7 +449,7 @@
          (if (include?/m (multiset literal) p q) ; q \subseteq? p
            <SATURATED>
            (let {[$r (trim-clause {@p @q})]}
-             (solve (debug-c r)))))]})))
+             ((make-solve resol) (debug-c r)))))]})))
 
 (define $solve  (make-solve resolution))
 (define $psolve (make-solve presolution))

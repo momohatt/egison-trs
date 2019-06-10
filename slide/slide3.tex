@@ -1,0 +1,223 @@
+\documentclass[dvipdfmx,11pt,notheorems]{beamer}
+%%%% 和文用 %%%%%
+\usepackage{bxdpx-beamer}
+\usepackage{pxjahyper}
+\usepackage{minijs}%和文用
+\usepackage{wrapfig}
+\usepackage{txfonts}
+\usepackage{minted}
+\usepackage{ascmac} % screen
+\usepackage{bussproofs}
+% \usepackage{tikz}
+\setminted{
+    breaklines,
+    mathescape=true,
+    fontsize=\footnotesize,
+}
+\renewcommand{\kanjifamilydefault}{\gtdefault}%和文用
+
+%%%% スライドの見た目 %%%%%
+\usetheme{Madrid}
+\usefonttheme{professionalfonts}
+\setbeamertemplate{frametitle}[default][left]
+\setbeamertemplate{navigation symbols}{}
+\setbeamercovered{transparent}%好みに応じてどうぞ）
+\setbeamertemplate{footline}[page number]
+\setbeamerfont{footline}{size=\normalsize,series=\bfseries}
+\setbeamercolor{footline}{fg=black,bg=black}
+%%%%
+
+%%%% 定義環境 %%%%%
+\usepackage{amsmath,amssymb}
+\usepackage{amsthm}
+\theoremstyle{definition}
+\newtheorem{theorem}{定理}
+\newtheorem{definition}{定義}
+\newtheorem{proposition}{命題}
+\newtheorem{lemma}{補題}
+\newtheorem{corollary}{系}
+\newtheorem{conjecture}{予想}
+\newtheorem*{remark}{Remark}
+\renewcommand{\proofname}{}
+%%%%%%%%%
+
+%%%%% フォント基本設定 %%%%%
+\usepackage[T1]{fontenc}%8bit フォント
+\usepackage{textcomp}%欧文フォントの追加
+\usepackage[utf8]{inputenc}%文字コードをUTF-8
+\usepackage{otf}%otfパッケージ
+\usepackage{bm}%数式太字
+%%%%%%%%%%
+
+\newcommand{\code}[1]{\mintinline{text}{#1}}
+\newcommand{\red}[1]{{\color{red} #1}}
+\newcommand{\blue}[1]{{\color{blue} #1}}
+\newcommand{\defines}{\ensuremath{\overset{\text{def}}{\,\Longleftrightarrow\,}}}
+\newcommand{\underred}[2]{\underset{\color{red} #1}{\underline{\color{red} #2}}}
+
+
+\title[]{paramodulationとsuperposition}%[略タイトル]{タイトル}
+\author[]{服部桃子}%[略名前]{名前}
+\institute[]{}%[略所属]{所属}
+\date{\today}%日付
+\begin{document}
+
+\begin{frame}[plain]\frametitle{}
+\titlepage %表紙
+\end{frame}
+
+\begin{frame}\frametitle{Contents}
+\tableofcontents %目次
+\end{frame}
+
+\section{前回までのあらすじ}
+\begin{frame}{前回までのあらすじ}
+  \begin{itemize}
+    \item 第1回: 導出原理とEgisonでの実装
+    \item 第2回: 項書き換え系の話
+    \begin{itemize}
+      \item 停止性、合流性
+      \item Lexicographic Path Order
+      \item Knuth-Bendix完備化
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{前回までのあらすじ / 導出原理}
+  \begin{block}{定義: resolvent}
+    \begin{itemize}
+      \item resolventの定義: 節$c, c_1, c_2$に対し以下を満たすリテラル$L_1, L_2$が存在するとき、$c$を$c_1, c_2$のresolventという
+      \begin{itemize}
+        \item $L_1 \in c_1$かつ$L_2^* \in c_2$
+        \item $L_1, L_2$の\red{最汎単一化子$\theta$}が存在し、$c = (c_1\theta \setminus \{L_1 \theta\}) \cup (c_2\theta \setminus \{L_2^* \theta\})$
+      \end{itemize}
+    \end{itemize}
+  \end{block}
+
+  \begin{exampleblock}{}
+    \begin{prooftree}
+      \AxiomC{$\{\red{P(a, b)}\}$}
+      \AxiomC{$\{\red{\lnot P(a, x)}, Q(x)\}$}
+      \RightLabel{{\footnotesize $\theta = [b / x]$}}
+      \BinaryInfC{$\{Q(b)\}$}
+    \end{prooftree}
+  \end{exampleblock}
+
+  \begin{block}{}
+    \begin{minted}{racket}
+(define $resolution ; resolventを求める
+  (match-all-lambda (multiset (multiset literal))
+    {[<cons <cons <lit ,1 $t> $xs>
+       ; $t$との最汎単一化子が$\sigma$であるようなリテラル$\lnot s$
+       <cons <cons <lit ,-1 (& <unify ,t $sigma> $s)> $ys>
+         _>>
+      {@(subst-clause sigma xs) @(subst-clause sigma ys)}]}))
+    \end{minted}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{前回までのあらすじ / 群の性質を示す}
+  \begin{itemize}
+    \item 群の公理から群の性質を示す
+    \begin{itemize}
+      \item 等式は単なる2項述語なので等式の公理も必要
+    \end{itemize}
+    \begin{minted}{racket}
+(define $p3
+  {@axioms-of-groups
+   @axioms-of-equality
+   @congruence-groups
+   ; (negation of) the goal: e * x = x
+   {<Lit -1 <Compound "=" <Compound "*" {e e1}> e1>>}})
+
+(solve p3) ; => 現実的な時間では終わらない
+    \end{minted}
+  \end{itemize}
+  \begin{block}{目標}
+    Egisonで実装した導出原理のプログラムを改良し、探索空間を減らす
+    \begin{itemize}
+      \item paramodulation
+      \item superposition
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\section{paramodulation}
+\begin{frame}{paramodulation}
+
+  {\Large
+  \begin{prooftree}
+    \AxiomC{$C \lor s \doteq t$}
+    \AxiomC{$D \lor P[s']$}
+    \BinaryInfC{$\sigma (C \lor D \lor P[t])$}
+  \end{prooftree}
+  }
+  \begin{itemize}
+    \item 導出原理で等式を直接扱う手法
+    \item 上のような規則を追加
+    \begin{itemize}
+      \item $s \doteq t$は「$s = t$または$t = s$」
+      \item $\sigma$は$s$と$s'$の最汎単一化子 \, ($\sigma = \text{mgu}(s, s')$)
+    \end{itemize}
+
+    \item 等式の公理は\blue{reflexivity(反射性)以外は}不要になる
+    \begin{itemize}
+      \item functional reflexivityも必要とされる
+      \begin{itemize}
+        \item $f(x_1, \ldots, x_n) = f(x_1, \ldots, x_n)$
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\subsection{理論}
+
+\begin{frame}{paramodulation / completeness}
+\begin{block}{定理: Refutational completeness}
+$S$がnormal model\footnote{"="が等号として解釈されるモデル}を持たないならば、
+$S$にreflexivityとfunctional reflexivityを加えたものからparamodulationと導出原理によって空節を導くことができる
+\end{block}
+
+\underline{証明(概略)}:
+
+\vspace{5pt}
+普通の導出原理の完全性を利用して、
+「導出原理 + 等式の公理で導出可能」ならば「導出原理 + paramodulation + reflexivityで導出可能」を示す
+\end{frame}
+
+\begin{frame}{paramodulation / completeness}
+  \begin{itemize}
+    \item 例えば導出原理+(1-ary)functional congruenceを用いている場合...
+    \begin{prooftree}
+      \AxiomC{$\lnot (x = x') \lor f(\ldots, x, \ldots) = f(\ldots, x', \ldots)$}
+      \AxiomC{$C \lor s = t$}
+      \BinaryInfC{$C \lor f(\ldots, s, \ldots) = f(\ldots, t, \ldots)$}
+    \end{prooftree}
+    paramodulation + functional reflexivityで次のように示せる
+    \begin{prooftree}
+      \AxiomC{$f(\ldots, x, \ldots) = f(\ldots, \red{[x]}, \ldots) \lor C$}
+      \AxiomC{$s = t$}
+      \RightLabel{\blue{$\sigma = [s / x]$}}
+      \BinaryInfC{$f(\ldots, \blue{s}, \ldots) = f(\ldots, \red{t}, \ldots) \lor C$}
+    \end{prooftree}
+
+    \vspace{10pt}
+    \item 他、(1-ary) predicate congruenceを用いている場合や、対称性・推移性を用いている場合も同様の議論
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{paramodulation / 実装}
+
+\end{frame}
+
+\subsection{実装}
+\section{superposition}
+\subsection{理論}
+
+\subsection{実装}
+
+\begin{frame}{(余談)導出原理の最適化}
+
+\end{frame}
+
+\end{document}

@@ -261,6 +261,13 @@
 (define $ord-cls
   (ord-mul ord-lit))
 
+(assert-equal "ord-eq"
+  (ord-eq (eql three two) (eql three one))
+  <Greater>)
+(assert-equal "ord-lit"
+  (ord-lit <Lit 1 (eql three two)> <Lit -1 (eql three one)>)
+  <Less>)
+
 ; (define $maximal-occur
 ;   (pattern-function [$p]
 ;     !<cons ?(eq? (ord-eq $ p) <Greater>) _>))
@@ -297,15 +304,15 @@
   (lambda [$l $ls $sigma]
     (let {[$l' (lsubst sigma l)]}
       (match (csubst sigma ls) (multiset literal)
-        {[<cons ?(lambda [$x] (eq? (ord-lit $x l') <Greater>)) _> #f]
+        {[<cons ?(lambda [$x] (eq? (ord-lit x l') <Greater>)) _> #f]
          [_ #t]}))))
 
 (define $maximal-strict-occur?
   (lambda [$l $ls $sigma]
     (let {[$l' (lsubst sigma l)]}
       (match (csubst sigma ls) (multiset literal)
-      {[<cons ?(lambda [$x] (or (eq? (ord-lit $x l') <Greater>)
-                                (eq? (ord-lit $x l') <Equal>))) _> #f]
+      {[<cons ?(lambda [$x] (eq? (ord-lit x l') <Greater>)) _> #f]
+       [<cons ?(lambda [$x] (eq? (ord-lit x l') <Equal>)) _> #f]
        [_ #t]}))))
 
 ; =============================== resolution ===================================

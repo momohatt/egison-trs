@@ -13,6 +13,8 @@
        [_ {}]}]
      [<unify ,$t $> something
       {[$s (unify t s)]}]
+     [<subterm $> term
+      {[$s (subterm s)]}]
      [$ something
       {[$tgt {tgt}]}]}))
 
@@ -96,6 +98,11 @@
        <Pred p (map (tsubst u $1) xs)>]
      [[$u <equation $l $r>]
        <Equation (tsubst u l) (tsubst u r)>]}))
+
+(define $lsubst
+  (match-lambda [something literal]
+    {[[$u <lit $sign $p>]
+        <Lit sign (psubst u p)>]}))
 
 (define $csubst
   (match-all-lambda [something (multiset literal)]
@@ -230,9 +237,7 @@
 
 (define $succ?
   (lambda [$x $y]
-    (match (ord-t x y) ordering
-      {[<greater> #t]
-       [_ #f]})))
+    (eq? (ord-t x y) <Greater>)))
 
 (define $ord-mul
   (lambda [$ord]
@@ -255,6 +260,53 @@
 
 (define $ord-cls
   (ord-mul ord-lit))
+
+; (define $maximal-occur
+;   (pattern-function [$p]
+;     !<cons ?(eq? (ord-eq $ p) <Greater>) _>))
+;
+; (define $maximal-strict-occur
+;   (pattern-function [$p]
+;     !<cons (| ?(eq? (ord-eq $ p) <Greater>)
+;               ?(eq? (ord-eq $ p) <Equal>)) _>))
+
+; (define $reductive
+;   (pattern-function [$s $t]
+;     (& !(succ? t s)
+;        !(eq? s t)
+;        <maximal-strict-occur <Equation s t>>)))
+
+; "closure sigma * {xs, s = t} is reductive for sigma * s = sigma * t"
+(define $reductive?
+  (lambda [$s $t $xs $sigma]
+    (let {[$t' (tsubst sigma t)]
+          [$s' (tsubst sigma s)]
+          [$xs' (csubst sigma xs)]}
+     (and (not (succ? t' s'))
+          (neq? s' t')
+          (maximal-strict-occur? <Lit 1 (eql s t)> xs sigma)))))
+
+(assert-equal "reductive?1"
+  (reductive? three two {<Lit 1 (eql three one)>} {})
+  #t)
+(assert-equal "reductive?2"
+  (reductive? three two {<Lit -1 (eql three one)>} {})
+  #f)
+
+(define $maximal-occur?
+  (lambda [$l $ls $sigma]
+    (let {[$l' (lsubst sigma l)]}
+      (match (csubst sigma ls) (multiset literal)
+        {[<cons ?(lambda [$x] (eq? (ord-lit $x l') <Greater>)) _> #f]
+         [_ #t]}))))
+
+(define $maximal-strict-occur?
+  (lambda [$l $ls $sigma]
+    (let {[$l' (lsubst sigma l)]}
+      (match (csubst sigma ls) (multiset literal)
+      {[<cons ?(lambda [$x] (or (eq? (ord-lit $x l') <Greater>)
+                                (eq? (ord-lit $x l') <Equal>))) _> #f]
+       [_ #t]}))))
 
 ; =============================== resolution ===================================
 
@@ -281,6 +333,17 @@
 (define $sresolution
   (match-all-lambda (multiset (multiset literal))
     {; superposition left
+     [(& <cons <cons <lit ,1 <equation $s $t>> $xs>
+          <cons <cons <lit ,-1
+              <equation (& <subterm (& !<var _> <unify ,s $sigma> $s')> $u) $v>>
+             $ys>
+            _>>
+         ?(reductive? s t xs sigma)
+         ?(neq? (tsubst sigma u) (tsubst sigma v))
+         ?(neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Greater>)
+         ?(maximal-occur? (eql u v) ys sigma))
+      (csubst sigma {@xs @ys <Lit -1 (eql (replace-term s' t u) v)>})
+     ]
 
      ; superposition right
 
@@ -362,7 +425,7 @@
      [<cons <cons <lit ,-1 <equation $s ,s>> <nil>> _>
       <REFUTE>]
      [$p
-      (let {[$q (presolution (rename-problem 0 p))]}
+      (let {[$q (sresolution (rename-problem 0 p))]}
         (if (include?/m (multiset literal) p q) ; q \subseteq? p
           <SATURATED>
           (let {[$r (trim-clause {@p @q})]}

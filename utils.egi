@@ -20,6 +20,8 @@
        [[<cons $x $xs> <cons ,x $ys>] (compare-c/fn ord xs ys)]
        [[<cons $x _> <cons $y _>] (ord x y)]})))
 
+(define $neq? (lambda [$x $y] (not (eq? x y))))
+
 ; ============================== pretty printing ===============================
 
 (define $append-strings

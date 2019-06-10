@@ -201,10 +201,20 @@
   (lambda [$x $ts]
     (all (succ? x $) ts)))
 
+(define $weight
+  (match-lambda string
+    {[,"O" 0]
+     [,"S" 1]
+     [,"+" 2]
+     [,"e" 1]
+     [,"e1" 1]
+     [,"e2" 1]
+     [,"*" 3]
+     [,"i" 4]}))
+
 (define $sigord
-  (match-lambda [string string]
-    {[[,"+" ,"S"] #t]
-     [_ #f]}))
+  (lambda [$f $g]
+    (gt? (weight f) (weight g))))
 
 ; Lexicographic Path Order
 (define $ord-t
@@ -451,6 +461,6 @@
            (let {[$r (trim-clause {@p @q})]}
              (solve (debug-c r)))))]})))
 
-(define $solve (make-solve resolution))
+(define $solve  (make-solve resolution))
 (define $psolve (make-solve presolution))
 (define $ssolve (make-solve sresolution))

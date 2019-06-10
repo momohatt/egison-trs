@@ -49,6 +49,11 @@
          [<equation $l $r> {@(subterm l) @(subterm r)}]
         })))))
 
+(assert-equal "subterm"
+  (match-all (eql (var x) (app "+" (var y) (app "*" (var z) (var w)))) prop
+    {[<subterm (& !<var _> $a)> a]})
+  {(app "+" (var y) (app "*" (var z) (var w))) (app "*" (var z) (var w))})
+
 (define $var (lambda $n <Var n>))
 
 (define $app
@@ -178,16 +183,10 @@
   (match-all-lambda (multiset (multiset literal))
      ; match equation
     {[<cons <cons <lit ,1 <equation $s $t>> $xs>
-       <cons <cons <lit $not (& <subterm (& <unify ,s $sigma> $s')> $p)> $ys>
+       <cons <cons <lit $sign
+           (& <subterm (& !<var _> <unify ,s $sigma> $s')> $p)> $ys>
          _>>
-      ; (io (do
-      ;   {[(print (append-strings
-      ;         {(show-term s') " <- " (show-term s) " = " (show-term t)}))]
-      ;    [(print (show-prop p))]
-      ;    ; [(print (show sigma))]
-      ;    [(print (show-clause (csubst sigma {@xs @ys <Lit not p>})))]
-      ;   }))
-      (csubst sigma {@xs @ys <Lit not (replace s' t p)>})
+      (csubst sigma {@xs @ys <Lit sign (replace s' t p)>})
      ]
      ; match predicate
      [<cons <cons <lit ,1 $t> $xs>
@@ -210,9 +209,10 @@
   (match-all-lambda (multiset (multiset literal))
      ; match equation
     {[<cons <cons <lit ,1 <equation $s $t>> $xs>
-       <cons <cons <lit $not (& <subterm (& <unify ,s $sigma> $s')> $p)> $ys>
+       <cons <cons <lit $sign
+           (& <subterm (& !<var _> <unify ,s $sigma> $s')> $p)> $ys>
          _>>
-      (csubst sigma {@xs @ys <Lit not (replace s' t p)>})]
+      (csubst sigma {@xs @ys <Lit sign (replace s' t p)>})]
      [<cons
         (& !<cons <lit ,-1 _> _> <cons <lit ,1 $t> $xs>)
         <cons
@@ -274,7 +274,7 @@
     {[<cons <nil> _>
       <REFUTE>]
      ; non-reflexive equation
-     [<cons <cons <lit ,-1 <equation $s ,s>> _> _>
+     [<cons <cons <lit ,-1 <equation $s ,s>> <nil>> _>
       <REFUTE>]
      [$p
       (let {[$q (presolution (rename-problem 0 p))]}

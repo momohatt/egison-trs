@@ -332,9 +332,10 @@
               (rename-problem (+ n (length u)) cs)))]}))
 
 (define $trim-clause
-  (match-all-lambda (list (multiset eq))
-    [<join _ <cons (& $z !<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>>)
-       !<join _ <cons ,z _>>>> z]))
+  (match-all-lambda (list (multiset literal))
+    [<join _ <cons
+      (& $z !<cons <lit ,1 $t> <cons <lit ,-1 ,t> _>>)
+       !<join _ <cons ,z _>> >> z]))
 
 (define $solve
   (match-lambda (multiset (multiset literal))

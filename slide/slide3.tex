@@ -144,6 +144,11 @@
 \end{frame}
 
 \section{paramodulation}
+
+\begin{frame}\frametitle{Contents}
+\tableofcontents[currentsection]
+\end{frame}
+
 \begin{frame}{paramodulation}
 
   {\Large
@@ -170,8 +175,6 @@
     \end{itemize}
   \end{itemize}
 \end{frame}
-
-\subsection{理論}
 
 \begin{frame}{paramodulation / completeness}
 \begin{block}{定理: Refutational completeness}
@@ -281,17 +284,185 @@ $S$にreflexivityとfunctional reflexivityを加えたものからparamodulation
   \end{block}
 \end{frame}
 
-\subsection{実装}
 \section{superposition}
-\subsection{理論}
-\begin{frame}{superposition}
 
+\begin{frame}\frametitle{Contents}
+\tableofcontents[currentsection]
+\end{frame}
+\begin{frame}{superposition}
+  \begin{itemize}
+    \item 項、等式、リテラル、節すべてに順序(重み)をつけ、一番重いものを書き換える
+    \begin{itemize}
+      \item 書き換えの結果軽くなるように
+    \end{itemize}
+    \item 参考文献
+    \begin{enumerate}
+      \item Bachmair, Leo, and Harald Ganzinger. \textit{Rewrite-based equational theorem proving with selection and simplification.} Journal of Logic and Computation 4.3 (1994): 217-247.
+      \item \url{http://resources.mpi-inf.mpg.de/departments/rg1/teaching/autrea-ss12/script/script23.pdf}
+    \end{enumerate}
+  \end{itemize}
 \end{frame}
 
-\subsection{実装}
+\begin{frame}{superposition / orderings}
+  \begin{block}{orderのmultiset拡張}
+    $\succ$を集合$S$上のorderingとすると、$S$の要素のmultiset上への拡張$\succ_{mul}$は次のように定義される
+    \vspace{-10pt}
+    \[
+    M \succ_{mul} N \defines
+    \left\{\begin{array}{l}
+    (i) \, M \not= N \\
+    (ii) \, \underred{\# x \in N}{N(x)} > M(x) \Rightarrow \exists y \succ x.\, M(y) > N(y) \\
+    \end{array}
+    \right.
+    \]
+  \end{block}
 
-\begin{frame}{(余談)導出原理の最適化}
+  \begin{exampleblock}{例}
+    \vspace{-10pt}
+    \begin{align*}
+      \{1, 2, 2, 3\} &>_{mul} \{1, 1, 2, 3\} \\
+      \{1, 2, 3\} &<_{mul} \{1, 1, 2, 3\}
+    \end{align*}
+  \end{exampleblock}
+\end{frame}
 
+\begin{frame}{superposition / orderings}
+  \begin{block}{等式の順序}
+    \[
+    s = t \, \red{\succ^e} \, u = v \defines \{s, t\} \succ_{mul} \{u, v\}
+    \]
+  \end{block}
+
+  \begin{block}{リテラルの順序}
+    \vspace{-10pt}
+    \begin{align*}
+      L(s = t) \, \red{\succ^o} \, L(u = v) &\defines M(L(s = t))\,  (\succ_{mul})_{mul} \, M(L(u = v)) \\
+      L(s, t) &= (s = t) \text{または} (s \not= t) \\
+      M(s = t) &= \{\{s\}, \{t\}\} \quad M(s \not= t) = \{\{s,\bot\},\{t ,\bot\}\}
+    \end{align*}
+  \end{block}
+
+  \begin{exampleblock}{例}
+    \vspace{-10pt}
+    \begin{align*}
+      S(S(O)) = S(O) \succ^e S(S(O)) = O \\
+      S(S(O)) = S(O) \prec^o S(S(O)) \not= O
+    \end{align*}
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{superposition / 推論規則}
+  \begin{block}{reductive}
+    $\succ$をreduction orderingとする。
+
+    節$C \lor s = t$が$s = t$について\red{reductive}であるとは、
+    \begin{enumerate}
+      \item $t \not\succeq s$
+      \item リテラル$s = t$はリテラルの順序について$C \lor s = t$でstrictに極大
+
+      ($\lnot\exists x \in C. \, x \succeq^o (s = t)$)
+    \end{enumerate}
+  \end{block}
+\end{frame}
+
+\begin{frame}{superposition / 推論規則}
+  Superposition Left:
+  \begin{prooftree}
+    \AxiomC{$C \lor s = t$}
+    \AxiomC{$u[s'] \not= v \lor D$}
+    \RightLabel{{\footnotesize $\sigma = \text{mgu}(s, s')$}}
+    \BinaryInfC{$(u[t] \not= v \lor C \lor D) \sigma$}
+  \end{prooftree}
+
+  Superposition Right:
+  \begin{prooftree}
+    \AxiomC{$C \lor s = t$}
+    \AxiomC{$u[s'] = v \lor D$}
+    \RightLabel{{\footnotesize $\sigma = \text{mgu}(s, s')$}}
+    \BinaryInfC{$(u[t] = v \lor C \lor D) \sigma$}
+  \end{prooftree}
+
+  Equality Resolution:
+  \begin{prooftree}
+    \AxiomC{$u \not= v \lor C$}
+    \RightLabel{{\footnotesize $\sigma = \text{mgu}(u, v)$}}
+    \UnaryInfC{$C \sigma$}
+  \end{prooftree}
+
+  Equality Factoring:
+  \begin{prooftree}
+    \AxiomC{$C \lor s = t \lor s' = t'$}
+    \RightLabel{{\footnotesize $\sigma = \text{mgu}(s, s')$}}
+    \UnaryInfC{$(C \lor t \not= t' \lor s' = t')\sigma$}
+  \end{prooftree}
+\end{frame}
+
+\begin{frame}{superposition / 推論規則}
+  \begin{block}{Superposition Left}
+    \begin{prooftree}
+      \AxiomC{$C \lor s = t$}
+      \AxiomC{$u[s'] \not= v \lor D$}
+      \RightLabel{{\footnotesize $\sigma = \text{mgu}(s, s')$}}
+      \BinaryInfC{$(u[t] \not= v \lor C \lor D) \sigma$}
+    \end{prooftree}
+    \vspace{-10pt}
+
+    \begin{itemize}
+      \item 節$(C \lor s = t)\sigma$は$s\sigma = t\sigma$についてreductive
+      \item $v\sigma \not\succeq u\sigma$, $u\sigma \not= v\sigma$は節$(u \not= v \lor D)\sigma$に含まれるリテラルの中で極大
+      \item $s'$は変数でない
+    \end{itemize}
+  \end{block}
+
+  \begin{block}{Superposition Right}
+    \begin{prooftree}
+      \AxiomC{$C \lor s = t$}
+      \AxiomC{$u[s'] = v \lor D$}
+      \RightLabel{{\footnotesize $\sigma = \text{mgu}(s, s')$}}
+      \BinaryInfC{$(u[t] = v \lor C \lor D) \sigma$}
+    \end{prooftree}
+    \vspace{-10pt}
+
+    \begin{itemize}
+      \item 節$(C \lor s = t)\sigma$は$s\sigma = t\sigma$についてreductive
+      \item 節$(D \lor u = v)\sigma$は$u\sigma = v\sigma$についてreductive
+      \item $s'$は変数でない
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}{superposition / 推論規則}
+  \begin{block}{Equality Resolution}
+    \begin{prooftree}
+      \AxiomC{$u \not= v \lor C$}
+      \RightLabel{{\footnotesize $\sigma = \text{mgu}(u, v)$}}
+      \UnaryInfC{$C \sigma$}
+    \end{prooftree}
+
+    \begin{itemize}
+      \item $u\sigma\not=v\sigma$は節$(u\not=v \lor C)\sigma$に含まれるリテラルの中で極大
+    \end{itemize}
+  \end{block}
+
+  \begin{block}{Equality Factoring}
+    \begin{prooftree}
+      \AxiomC{$C \lor s = t \lor s' = t'$}
+      \RightLabel{{\footnotesize $\sigma = \text{mgu}(s, s')$}}
+      \UnaryInfC{$(C \lor t \not= t' \lor s' = t')\sigma$}
+    \end{prooftree}
+
+    \begin{itemize}
+      \item $t\sigma \not\succ s\sigma$かつ$t'\sigma \not\succ s'\sigma$
+      \item $s\sigma = t\sigma$は節$(C \lor s=t \lor s'=t')\sigma$に含まれるリテラルの中で極大
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}{superposition / 実装}
+  \begin{itemize}
+    \item 実装の詳細は面白いところがないので割愛します
+    \item 動いているところ: demo
+  \end{itemize}
 \end{frame}
 
 \end{document}

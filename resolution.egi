@@ -44,7 +44,7 @@
 
 ;; prop -> {term, term -> prop}
 (define $psubterm
-  (match-all-lambda p prop
+  (match-all-lambda prop
     {[<pred $f <join $xs <cons <subterm $x $env> $xs'>>>
        [x (lambda [$x] <Pred f (append xs (cons (env x) xs'))>)]]
      [<equation <subterm $x $env> $r>
@@ -109,7 +109,7 @@
 (define $csubst
   (match-all-lambda [something (multiset literal)]
     {[[$u <cons <lit $p $t> _>]
-      <Lit p (psubst u t)>]}))
+        <Lit p (psubst u t)>]}))
 
 (assert-equal "csubst"
   (csubst {[y <Var x>] [x <Var z>]} {<Lit 1 (eql (var x) (var y))>})
@@ -343,7 +343,7 @@
             (and (reductive? s t xs sigma)
                  (neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Greater>)
                  (neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Equal>)
-                 (maximal-occur? (eql u v) ys sigma))))
+                 (maximal-occur? <Lit -1 (eql u v)> ys sigma))))
       (csubst sigma {@xs @ys <Lit -1 (eql (env t) v)>})
      ]
 
@@ -362,7 +362,7 @@
      ; equality resolution
      [(& <cons <cons <lit ,-1 <equation $u (& <unify ,u $sigma> $v)>> $ys> _>
          ?(lambda [$z]
-            (maximal-occur? (eql u v) ys sigma)))
+            (maximal-occur? <Lit -1 (eql u v)> ys sigma)))
       (csubst sigma ys)
      ]
 
@@ -372,7 +372,7 @@
          ?(lambda [$z]
             (and (neq? (ord-t (tsubst sigma t ) (tsubst sigma s )) <Greater>)
                  (neq? (ord-t (tsubst sigma t') (tsubst sigma s')) <Greater>)
-                 (maximal-occur? (eql s t) {(eql s' t') @xs} sigma))))
+                 (maximal-occur? <Lit 1 (eql s t)> {<Lit 1 (eql s' t')> @xs} sigma))))
       (csubst sigma {<Lit -1 (eql t t')> <Lit 1 (eql s' t')> @xs})
      ]
 

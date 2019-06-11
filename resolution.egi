@@ -12,7 +12,10 @@
       {[<Compound $s $l> {[s l]}]
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (unify t s)]}]
+      {[$s (match (unify t s) (maybe something)
+            {[(just $sigma) {sigma}]
+             [(nothing)     {}]
+            })]}]
      [<subterm $ $> [term something]
       {[$s (subterm s)]}]
      [$ something
@@ -119,35 +122,35 @@
 (define $unify
   (match-lambda (unordered-pair term)
     {[<pair <var $x> <var ,x>>
-      {{}}] ; 成功(空の代入を返す)
+      (Just {})] ; 成功(空の代入を返す)
      [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
-      {{[x t]}}] ; 代入[t/x]を返す
+      (Just {[x t]})] ; 代入[t/x]を返す
      [<pair <compound $f <nil>> <compound ,f <nil>>>
-      {{}}] ; 成功
+      (Just {})] ; 成功
      [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
       (match (unify x y) (list something)
-       {[,{} {}] ; unifyがすでに失敗している
+       {[,{} Nothing] ; unifyがすでに失敗している
         [<cons $u1 <nil>> ; unifiableな場合、単一化子をsingletonから取り出す
          (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
                 (list something)
-          {[,{} {}] ; 失敗
-           [<cons $u2 <nil>> {{@u1 @u2}}]})]})] ; {@u1 @u2}はu1 ++ u2
-     [_ {}]}))
+          {[,{} Nothing] ; 失敗
+           [<cons $u2 <nil>> (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
+     [_ Nothing]}))
 
 ; unify propositions (only predicates)
 (define $punify
   (match-lambda (unordered-pair prop)
     {[<pair <pred $p <nil>> <pred ,p <nil>>>
-      {{}}]
+      (Just {})]
      [<pair <pred $p <cons $x $xs>> <pred ,p <cons $y $ys>>>
       (match (unify x y) (list something)
-       {[,{} {}]
+       {[,{} Nothing]
         [<cons $u1 <nil>>
          (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
                 (list something)
-          {[,{} {}] ; 失敗
-           [<cons $u2 <nil>> {{@u1 @u2}}]})]})]
-     [_ {}]
+          {[,{} Nothing] ; 失敗
+           [<cons $u2 <nil>> (Just {@u1 @u2})]})]})]
+     [_ Nothing]
     }))
 
 (define $literal

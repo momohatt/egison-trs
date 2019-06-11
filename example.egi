@@ -123,6 +123,17 @@
    {<Lit -1 (eql x y)> <Lit 1 (eql x' y')>}
   })
 
+(define $axioms-of-groups-complete
+  {@axioms-of-groups
+   {<Lit 1 (eql (i (p y x)) (p x' y'))>}
+   {<Lit 1 (eql (p y' (p y x)) x)>}
+   {<Lit 1 (eql (p x' x) e)>}
+   {<Lit 1 (eql (i e) e)>}
+   {<Lit 1 (eql (i x') x)>}
+   {<Lit 1 (eql (p e x) x)>}
+   {<Lit 1 (eql (p x (p x' y)) y)>}
+  })
+
 ; (1) (2) (4) |= (5)
 (define $p3
   {@axioms-of-groups
@@ -136,6 +147,12 @@
   {@axioms-of-groups
    ; (negation of) the goal: x^-1 * x = e
    {<Lit -1 (eql (p (i e2) e2) e)>}})
+
+(define $g1
+  {@axioms-of-groups-complete
+   ; i(x) * y * x * i(y) = e
+   {<Lit -1 (eql (p x' (p y (p x y'))) e)>}
+  })
 
 ; ==============================================================================
 

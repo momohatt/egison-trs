@@ -45,8 +45,10 @@
      [<var ,3> "w"]
      [<var $x> (append-strings {"x" (show x)})]
      [<compound $f ,{}> f]
+     [<compound ,"+" <cons (& <compound ,"+" _> $x) <cons $y <nil>>>>
+       (append-strings {"(" (show-term x) ") + " (show-term y)})]
      [<compound ,"+" <cons $x <cons $y <nil>>>>
-       (append-strings {"(" (show-term x) " + " (show-term y) ")"})]
+       (append-strings {(show-term x) " + " (show-term y)})]
      [<compound ,"*" <cons (& <compound ,"*" _> $x) <cons $y <nil>>>>
        (append-strings {"(" (show-term x) ") * " (show-term y)})]
      [<compound ,"*" <cons $x <cons $y <nil>>>>
@@ -70,9 +72,11 @@
      [<lit ,-1 $t> (append-string "~" (show-prop t))]}))
 
 (define $show-clause
-  (lambda [$cls]
-    (let {[$x (concat-strings (map show-lit cls) ", ")]}
-      (append-strings {"{" x "}"}))))
+  (match-lambda clause
+    {[[_ $cls]
+              (let {[$x (concat-strings (map show-lit cls) ", ")]}
+                (append-strings {"{" x "}"}))]
+     }))
 
 (define $show-clauses
   (lambda [$clss]

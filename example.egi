@@ -19,16 +19,11 @@
 (assert "occur2" (not (test-occur z t1)))
 
 (assert "fv1"
-  (match (fv t1) (multiset something)
-   {[,{0 1} #t]
-    [_ #f]}))
-
-(assert-equal "fv2"
-  (fv t2)
-  {})
-
-(assert-equal "fv-clause-eq"
-  (fv-clause {<Lit 1 (eql x y)> <Lit 1 (pred "P" z w)>})
+  (match (pfv t1) (multiset integer)
+    {[,{0 1} #t]
+     [_ #f]}))
+(assert-equal "cfv-eq"
+  (cfv [#t {<Lit 1 (eql x y)> <Lit 1 (pred "P" z w)>}])
   {0 1 2 3})
 
 (assert-equal "subterm1"
@@ -54,7 +49,10 @@
   (eql (app "f" z) (app "+" x z)))
 
 (assert-equal "csubst1"
-  (csubst {[1 x] [0 z]} {<Lit 1 (eql x y)>})
+  (csubst {[1 x] [0 z]} [#t {<Lit 1 (eql x y)>}])
+  [#t {<Lit 1 (eql z x)>}])
+(assert-equal "csubst'1"
+  (csubst' {[1 x] [0 z]} {<Lit 1 (eql x y)>})
   {<Lit 1 (eql z x)>})
 
 ; t1 = P(g(x), y)
@@ -62,7 +60,9 @@
 (assert-equal "unify1" (unify x x) {{}})
 (assert-equal "unify2" (unify t1 z) {{[z t1]}})
 ; {[x, g(c)], [y, c]}
-(assert-equal "unify3" (unify-prop t1 t2) {{[0 <Compound "g" {<Compound "c" {}>}>] [1 <Compound "c" {}>]}})
+(assert-equal "unify3"
+  (unify-prop t1 t2)
+  {{[0 <Compound "g" {<Compound "c" {}>}>] [1 <Compound "c" {}>]}})
 
 ; ========================= example (group theory) =============================
 
@@ -79,7 +79,10 @@
 ; \forall x y. (P(g(x),y) \to P(x,f(x,y))) \land \lnot P(c,y) \land P(g(g(c)),c)
 ; 4. Conjunction normal form
 ; (\lnot P(g(x),y) \lor P(x,f(x,y))) \land \lnot P(c,y) \land P(g(g(c)),c)
-(define $p1 {{<Lit -1 t1> <Lit 1 t3>} {<Lit -1 t4>} {<Lit 1 t2>}})
+(define $p1
+  {[#f {<Lit -1 t1> <Lit 1 t3>}]
+   [#f {<Lit -1 t4>}]
+   [#f {<Lit 1 t2>}]})
 
 ; Drinker's paradox
 ; 1. \lnot \exists x. D(x) \to \forall y. D(y)
@@ -87,7 +90,8 @@
 ; 3. \forall x. D(x) \land \lnot D(c)
 ; 4. D(x) \land \lnot D(c)
 (define $p2
-  {{<Lit 1 (pred "D" x)>} {<Lit -1 (pred "D" (app "c"))>}})
+  {[#f {<Lit 1 (pred "D" x)>}]
+   [#f {<Lit -1 (pred "D" (app "c"))>}]})
 
 ; Recall the axioms of groups:
 ; (1) (x*y)*z = x*(y*z)
@@ -122,92 +126,96 @@
 ; - \lnot (p(i(e1),e1) = e) \lor \lnot (p(e,e2) = e2)
 
 (define $axioms-of-groups
-  {{<Lit 1 (eql (p (p x y) z) (p x (p y z)))>}
-   {<Lit 1 (eql (p x x') e)>}
-   {<Lit 1 (eql (p x e) x)>}
+  {[#t {<Lit 1 (eql (p (p x y) z) (p x (p y z)))>}]
+   [#t {<Lit 1 (eql (p x x') e)>}]
+   [#t {<Lit 1 (eql (p x e) x)>}]
   })
 
 (define $axioms-of-equality
-  {{<Lit 1 (eql x x)>}
-   {<Lit -1 (eql x y)> <Lit 1 (eql y x)>}
-   {<Lit -1 (eql x y)> <Lit -1 (eql y z)> <Lit 1 (eql x z)>}
+  {[#t {<Lit  1 (eql x x)>}]
+   [#t {<Lit -1 (eql x y)> <Lit 1 (eql y x)>}]
+   [#t {<Lit -1 (eql x y)> <Lit -1 (eql y z)> <Lit 1 (eql x z)>}]
   })
 
 (define $congruence-groups
-  {{<Lit -1 (eql x y)> <Lit -1 (eql z w)> <Lit 1 (eql (p x z) (p y w))>}
-   {<Lit -1 (eql x y)> <Lit 1 (eql x' y')>}
+  {[#t {<Lit -1 (eql x y)> <Lit -1 (eql z w)> <Lit 1 (eql (p x z) (p y w))>}]
+   [#t {<Lit -1 (eql x y)> <Lit 1 (eql x' y')>}]
   })
 
 (define $axioms-of-groups-complete
   {@axioms-of-groups
-   {<Lit 1 (eql (i (p y x)) (p x' y'))>}
-   {<Lit 1 (eql (p y' (p y x)) x)>}
-   {<Lit 1 (eql (p x' x) e)>}
-   {<Lit 1 (eql (i e) e)>}
-   {<Lit 1 (eql (i x') x)>}
-   {<Lit 1 (eql (p e x) x)>}
-   {<Lit 1 (eql (p x (p x' y)) y)>}
+   [#t {<Lit 1 (eql (i (p y x)) (p x' y'))>}]
+   [#t {<Lit 1 (eql (p y' (p y x)) x)>}]
+   [#t {<Lit 1 (eql (p x' x) e)>}]
+   [#t {<Lit 1 (eql (i e) e)>}]
+   [#t {<Lit 1 (eql (i x') x)>}]
+   [#t {<Lit 1 (eql (p e x) x)>}]
+   [#t {<Lit 1 (eql (p x (p x' y)) y)>}]
   })
 
 ; (1) (2) (4) |= (5)
 (define $p3
   {@axioms-of-groups
    ; (negation of) the goal: e * x = x
-   {<Lit -1 (eql (p e e1) e1)>}})
+   [#f {<Lit -1 (eql (p e e1) e1)>}]
+   })
 
 ; (1) (2) (4) |= (3)
 (define $p4
   {@axioms-of-groups
    ; (negation of) the goal: x^-1 * x = e
-   {<Lit -1 (eql (p (i e2) e2) e)>}})
+   [#f {<Lit -1 (eql (p (i e2) e2) e)>}]
+   })
 
 (define $g1
   {@axioms-of-groups-complete
    ; i(x) * y * x * i(y) = e
-   {<Lit -1 (eql (p x' (p y (p x y'))) e)>}
-  })
+   [#f {<Lit -1 (eql (p x' (p y (p x y'))) e)>}]
+   })
 
 ; ==============================================================================
 
 (define $p5
   ; Issac is a boy
-  {{<Lit 1 (pred "B" (app "i"))>}
+  {[#t {<Lit 1 (pred "B" (app "i"))>}]
    ; Kate is a girl
-   {<Lit 1 (pred "G" (app "k"))>}
+   [#t {<Lit 1 (pred "G" (app "k"))>}]
    ; Joe's friends are all tall
-   {<Lit -1 (pred "F" (app "j") x)> <Lit 1 (pred "T" x)>}
+   [#t {<Lit -1 (pred "F" (app "j") x)> <Lit 1 (pred "T" x)>}]
    ; Harry loves any girl that is tall
-   {<Lit -1 (pred "G" y)> <Lit -1 (pred "T" y)> <Lit 1 (pred "L" (app "h") y)>}
+   [#t {<Lit -1 (pred "G" y)> <Lit -1 (pred "T" y)> <Lit 1 (pred "L" (app "h") y)>}]
    ; Issac is a friend of Joe
-   {<Lit 1 (pred "F" (app "j") (app "i"))>}
+   [#t {<Lit 1 (pred "F" (app "j") (app "i"))>}]
    ; Kate is a friend of Joe
-   {<Lit 1 (pred "F" (app "j") (app "k"))>}
+   [#t {<Lit 1 (pred "F" (app "j") (app "k"))>}]
 
    ; question: does Harry love any of Joe's friends? If he does, who does he love?
-   {<Lit -1 (pred "L" (app "h") z)> <Lit -1 (pred "F" (app "j") z)>}
+   [#f {<Lit -1 (pred "L" (app "h") z)> <Lit -1 (pred "F" (app "j") z)>}]
   })
 
 (define $p6
    ; Kate is a girl
-  {{<Lit 1 (pred "G" (app "k"))>}
+  {[#t {<Lit 1 (pred "G" (app "k"))>}]
    ; Joe's friends are all tall
-   {<Lit -1 (pred "F" (app "j") x)> <Lit 1 (pred "T" x)>}
+   [#t {<Lit -1 (pred "F" (app "j") x)> <Lit 1 (pred "T" x)>}]
    ; Harry loves any girl that is tall
-   {<Lit -1 (pred "G" y)> <Lit -1 (pred "T" y)> <Lit 1 (pred "L" (app "h") y)>}
+   [#t {<Lit -1 (pred "G" y)> <Lit -1 (pred "T" y)> <Lit 1 (pred "L" (app "h") y)>}]
    ; Kate is a friend of Joe
-   {<Lit 1 (pred "F" (app "j") (app "k"))>}
+   [#t {<Lit 1 (pred "F" (app "j") (app "k"))>}]
 
    ; question: does Harry love any of Joe's friends? If he does, who does he love?
-   {<Lit -1 (pred "L" (app "h") z)> <Lit -1 (pred "F" (app "j") z)>}})
+   [#f {<Lit -1 (pred "L" (app "h") z)> <Lit -1 (pred "F" (app "j") z)>}]
+   })
 
 ; ==============================================================================
 
 (define $axioms-of-nat
    ; O + x = x
-  {{<Lit 1 (eql (app "+" (app "O") x) x)>}
+  {[#t {<Lit 1 (eql (app "+" (app "O") x) x)>}]
    ; S(m) + n = m + S(n)
-   {<Lit 1 (eql (app "+" (app "S" x) y)
-                (app "+" x (app "S" y)))>}})
+   [#t {<Lit 1 (eql (app "+" (app "S" x) y)
+                    (app "+" x (app "S" y)))>}]
+   })
 
 (define $zero  (app "O"))
 (define $one   (app "S" (app "O")))
@@ -218,12 +226,14 @@
 (define $p7
   {@axioms-of-nat
    ; S(O) + S(S(O)) = S(S(S(O)))
-   {<Lit -1 (eql (app "+" one two) three)>}})
+   [#f {<Lit -1 (eql (app "+" one two) three)>}]
+   })
 
 (define $p8
   {@axioms-of-nat
    ; O + S(S(O)) = S(S(O))
-   {<Lit -1 (eql (app "+" zero two) two)>}})
+   [#f {<Lit -1 (eql (app "+" zero two) two)>}]
+   })
 
 (define $p9
-  {{<Lit -1 (eql x x)>}})
+  {[#f {<Lit -1 (eql x x)>}]})

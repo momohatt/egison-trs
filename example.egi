@@ -27,20 +27,35 @@
   (fv t2)
   {})
 
+(assert-equal "fv-clause-eq"
+  (fv-clause {<Lit 1 (eql x y)> <Lit 1 (pred "P" z w)>})
+  {0 1 2 3})
+
+(assert-equal "subterm1"
+  ; x = (y + (z * w))
+  (match-all (eql x (app "+" y (app "*" z w))) prop
+    {[<subterm (& !<var _> $a) $env> [a (env (var 4))]]})
+  {[(app "*" z w) (eql (app "+" y (var 4)) x)]
+   [(app "+" y (app "*" z w)) (eql (var 4) x)]})
+
 ; [z / x, x / y] P(g(x), y) = P(g(z), x)
 (assert-equal "subst1"
-  (psubst {[y <Var x>] [x <Var z>]} t1)
-  (pred "P" (app "g" z x)))
+  (psubst {[1 x] [0 z]} t1)
+  (pred "P" (app "g" z) x))
 
 ; [z / z] P(g(x), y) = P(g(x), y)
 (assert-equal "subst2"
-  (psubst {[z <Var z>]} t1)
+  (psubst {[2 z]} t1)
   (pred "P" (app "g" x) y))
 
 (assert-equal "subst3"
-  (psubst {[y <Var x>] [x <Var z>]}
+  (psubst {[1 x] [0 z]}
     (eql (app "f" x) (app "+" y x)))
   (eql (app "f" z) (app "+" x z)))
+
+(assert-equal "csubst1"
+  (csubst {[1 x] [0 z]} {<Lit 1 (eql x y)>})
+  {<Lit 1 (eql z x)>})
 
 ; t1 = P(g(x), y)
 ; t2 = P(g(g(c)), c)
@@ -139,8 +154,6 @@
   {@axioms-of-groups
    ; (negation of) the goal: e * x = x
    {<Lit -1 (eql (p e e1) e1)>}})
-
-(assert-equal "solve3" (solve p3) <REFUTE>)
 
 ; (1) (2) (4) |= (3)
 (define $p4

@@ -37,6 +37,26 @@
      [$ something
        {[$tgt {tgt}]}]}))
 
+(define $literal
+  (algebraic-data-matcher
+    ; intergerは1ならそのまま、-1ならnegateされる
+    {<lit integer prop>}))
+
+(define $var (lambda $n <Var n>))
+(define $bottom (var -1))
+
+(define $app
+  (cambda $xs
+    (match xs (list something)
+      {[<cons $x $xs> <Compound x xs>]})))
+
+(define $pred
+  (cambda $xs
+    (match xs (list something)
+      {[<cons $x $xs> <Pred x xs>]})))
+
+(define $eql (lambda [$x $y] <Equation x y>))
+
 ;; term -> {term, term -> term}
 (define $subterm
   (match-all-lambda term
@@ -54,39 +74,25 @@
        [x (lambda [$x] <Equation (env x) r>)]]
     }))
 
-(assert-equal "subterm"
-  ; x = (y + (z * w))
-  (match-all (eql (var x) (app "+" (var y) (app "*" (var z) (var w)))) prop
-    {[<subterm (& !<var _> $a) $env> [a (env (var 4))]]})
-  {[(app "*" (var z) (var w)) (eql (var x) (app "+" (var y) (var 4)))]
-   [(app "+" (var y) (app "*" (var z) (var w))) (eql (var x) (var 4))]})
-
-(define $var (lambda $n <Var n>))
-(define $bottom (var -1))
-
-(define $app
-  (cambda $xs
-    (match xs (list something)
-      {[<cons $x $xs>
-        <Compound x xs>]})))
-
-(define $pred
-  (cambda $xs
-    (match xs (list something)
-      {[<cons $x $xs>
-        <Pred x xs>]})))
-
-(define $eql (lambda [$x $y] <Equation x y>))
-
 (define $occur
   (pattern-function [$v]
     (| <var v>
        <compound _ <join _ <cons (occur v) _>>>
        )))
 
+(define $occur-prop
+  (pattern-function [$v]
+    (| <pred _ <join _ <cons (occur v) _>>>
+       <equation (occur v) _>)))
+
 (define $fv
   (match-all-lambda term
     {[(occur $v) v]}))
+
+(define $fv-clause
+  (lambda [$x]
+    (unique (match-all x (multiset literal)
+             [<cons <lit _ (occur-prop $v)> _> v]))))
 
 (define $tsubst
   (match-lambda [something term]
@@ -113,10 +119,6 @@
   (match-all-lambda [something (multiset literal)]
     {[[$u <cons <lit $p $t> _>]
         <Lit p (psubst u t)>]}))
-
-(assert-equal "csubst"
-  (csubst {[y <Var x>] [x <Var z>]} {<Lit 1 (eql (var x) (var y))>})
-  {<Lit 1 (var z) (var x)>})
 
 ; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
 (define $unify
@@ -152,22 +154,6 @@
            [<cons $u2 <nil>> (Just {@u1 @u2})]})]})]
      [_ Nothing]
     }))
-
-(define $literal
-  (algebraic-data-matcher
-    ; intergerは1ならそのまま、-1ならnegateされる
-    {<lit integer prop>}))
-
-(define $fv-clause
-  (lambda [$x]
-    (unique (match-all x (multiset literal)
-             {[<cons <lit _ <pred _
-                              <join _ <cons (occur $v) _>>>> _> v]
-              [<cons <lit _ <equation (occur $v) _>> _> v]}))))
-
-(assert-equal "fv-clause-eq"
-  (fv-clause {<Lit 1 (eql (var x) (var y))> <Lit 1 (pred "P" (var z) (var w))>})
-  {(var x) (var y) (var z) (var w)})
 
 ; ================================== LPO =======================================
 

@@ -121,16 +121,12 @@
     {[[$u <lit $sign $p>]
         <Lit sign (psubst u p)>]}))
 
-(define $csubst
-  (match-lambda [something clause]
-    {[[$u [$b $ls]]
-       [b (match-all ls (multiset literal)
-            [<cons <lit $p $t> _> <Lit p (psubst u t)>])]]}))
-
-; booleanのタグがない
 (define $csubst'
   (match-all-lambda [something (multiset literal)]
     [[$u <cons <lit $p $t> _>] <Lit p (psubst u t)>]))
+(define $csubst
+  (match-lambda [something clause]
+    {[[$u [$b $ls]] [b (csubst' u ls)]]}))
 
 ; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
 (define $unify

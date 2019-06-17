@@ -106,6 +106,8 @@
 (define $e (app "e"))
 (define $e1 (app "e1"))
 (define $e2 (app "e2"))
+(define $e1' (i e1))
+(define $e2' (i e2))
 
 (define $x' (i x))
 (define $y' (i y))
@@ -170,7 +172,7 @@
 (define $g1
   {@axioms-of-groups-complete
    ; i(x) * y * x * i(y) = e
-   [#f {<Lit -1 (eql (p x' (p y (p x y'))) e)>}]
+   [#f {<Lit -1 (eql (p e1' (p e2 (p e1 e2'))) e)>}]
    })
 
 ; ==============================================================================

@@ -106,8 +106,12 @@
 (define $e (app "e"))
 (define $e1 (app "e1"))
 (define $e2 (app "e2"))
+(define $e3 (app "e3"))
+(define $e4 (app "e4"))
 (define $e1' (i e1))
 (define $e2' (i e2))
+(define $e3' (i e3))
+(define $e4' (i e4))
 
 (define $x' (i x))
 (define $y' (i y))
@@ -169,11 +173,36 @@
    [#f {<Lit -1 (eql (p (i e2) e2) e)>}]
    })
 
+; (e1 * e1')'
+(define $g1' (i (p e1 e1')))
+; (e1 * e1')'
+; -> e'
+; -> e
 (define $g1
   {@axioms-of-groups-complete
-   ; i(x) * y * x * i(y) = e
-   [#f {<Lit -1 (eql (p e1' (p e2 (p e1 e2'))) e)>}]
-   })
+   [#f {<Lit -1 (eql e g1')>}]})
+
+; (((e2 * e3) * e4)' * e2)' * e4'
+(define $g2' (p (i (p (i (p (p e2 e3) e4)) e2))
+                (i e4)))
+; (((e2 * e3) * e4)' * e2)' * e4'
+; -> (e4' * (e2 * e3)' * e2)' * e4'
+; -> (e4' * e3' * e2' * e2)' * e4'
+; -> (e4' * e3' * e)' * e4'
+; -> (e4' * e3')' * e4'
+; -> e3'' * e4'' * e4'
+; -> e3'' * e4 * e4'
+; -> e3'' * e
+; -> e3 * e
+; -> e3
+(define $g2
+  {@axioms-of-groups-complete
+   [#f {<Lit -1 (eql e3 g2')>}]})
+
+(define $g3' (p g1' g2'))
+(define $g3
+  {@axioms-of-groups-complete
+   [#f {<Lit -1 (eql e3 g3')>}]})
 
 ; ==============================================================================
 

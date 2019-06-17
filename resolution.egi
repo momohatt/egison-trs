@@ -185,6 +185,8 @@
      [,"e" 1]
      [,"e1" 1]
      [,"e2" 1]
+     [,"e3" 1]
+     [,"e4" 1]
      [,"*" 3]
      [,"i" 4]
      [_ (debug 0)]}))
@@ -345,7 +347,7 @@
   (match-all-lambda (multiset clause)
      ; superposition left
     {[(& <cons [_  <cons <lit ,1 <equation $s $t>> $xs>]
-         <cons [$b <cons <lit ,-1
+         <cons [,#f <cons <lit ,-1
            <equation (& <subterm (& !<var _> <unify ,s $sigma> $s') $env> $u) $v>>
              $ys>]
             _>>
@@ -354,38 +356,38 @@
                  (neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Greater>)
                  (neq? (ord-t (tsubst sigma v) (tsubst sigma u)) <Equal>)
                  (maximal-occur? <Lit -1 (eql u v)> ys sigma))))
-      [b (csubst' sigma {@xs @ys <Lit -1 (eql (env t) v)>})]
+      [#f (csubst' sigma {@xs @ys <Lit -1 (eql (env t) v)>})]
      ]
 
      ; superposition right
      [(& <cons [_  <cons <lit ,1 <equation $s $t>> $xs>]
-         <cons [$b <cons <lit ,1
+         <cons [,#f <cons <lit ,1
            <equation (& <subterm (& !<var _> <unify ,s $sigma> $s') $env> $u) $v>>
              $ys>]
             _>>
          ?(lambda [$z] ; z does not occur
             (and (reductive? s t xs sigma)
                  (reductive? u v ys sigma))))
-      [b (csubst' sigma {@xs @ys <Lit 1 (eql (env t) v)>})]
+      [#f (csubst' sigma {@xs @ys <Lit 1 (eql (env t) v)>})]
      ]
 
      ; equality resolution
-     [(& <cons [$b <cons <lit ,-1 <equation $u (& <unify ,u $sigma> $v)>> $ys>] _>
+     [(& <cons [,#f <cons <lit ,-1 <equation $u (& <unify ,u $sigma> $v)>> $ys>] _>
          ?(lambda [$z]
             (maximal-occur? <Lit -1 (eql u v)> ys sigma)))
-      [b (csubst' sigma ys)]
+      [#f (csubst' sigma ys)]
      ]
 
      ; equality factoring
      [(& <cons
-           [$b <cons <lit ,1 <equation $s $t>>
-               <cons <lit ,1 <equation (& <unify ,s $sigma> $s') $t'>> $xs>>] _>
+           [,#f <cons <lit ,1 <equation $s $t>>
+                <cons <lit ,1 <equation (& <unify ,s $sigma> $s') $t'>> $xs>>] _>
          ?(lambda [$z]
             (and
               (neq? (ord-t (tsubst sigma t ) (tsubst sigma s )) <Greater>)
               (neq? (ord-t (tsubst sigma t') (tsubst sigma s')) <Greater>)
               (maximal-occur? <Lit 1 (eql s t)> {<Lit 1 (eql s' t')> @xs} sigma))))
-      [b (csubst sigma' {<Lit -1 (eql t t')> <Lit 1 (eql s' t')> @xs})]
+      [#f (csubst sigma' {<Lit -1 (eql t t')> <Lit 1 (eql s' t')> @xs})]
      ]
      }))
 

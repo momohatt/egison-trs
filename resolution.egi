@@ -1,25 +1,6 @@
 ; Implementation of resolution principle for first-order logic in Egison
 
-(load-file "utils.egi")
-
-(define $term
-  (matcher
-    {[<var $> integer
-      {[<Var $i> {i}]
-       [_ {}]}]
-     ; 関数適用
-     [<compound $ $> [string (list term)]
-      {[<Compound $s $l> {[s l]}]
-       [_ {}]}]
-     [<unify ,$t $> something
-      {[$s (match (unify t s) (maybe something)
-            {[(just $sigma) {sigma}]
-             [(nothing)     {}]
-            })]}]
-     [<subterm $ $> [term something]
-      {[$s (subterm s)]}]
-     [$ something
-      {[$tgt {tgt}]}]}))
+(load-file "term.egi")
 
 (define $prop
   (matcher
@@ -46,13 +27,7 @@
   ; #t -> axiom, #f -> target (non-axiom)
   [bool (multiset literal)])
 
-(define $var (lambda $n <Var n>))
 (define $bottom (var -1))
-
-(define $app
-  (cambda $xs
-    (match xs (list something)
-      {[<cons $x $xs> <Compound x xs>]})))
 
 (define $pred
   (cambda $xs
@@ -60,14 +35,6 @@
       {[<cons $x $xs> <Pred x xs>]})))
 
 (define $eql (lambda [$x $y] <Equation x y>))
-
-;; term -> {term, term -> term}
-(define $subterm
-  (match-all-lambda term
-    {[<compound $f <join $xs <cons <subterm $x $env> $xs'>>>
-       (let {[$env' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
-         [x (compose env' env)])]
-     [$t [t id]]}))
 
 ;; prop -> {term, term -> prop}
 (define $psubterm
@@ -77,11 +44,6 @@
      [<equation <subterm $x $env> $r>
        [x (lambda [$x] <Equation (env x) r>)]]
     }))
-
-(define $occur
-  (pattern-function [$v]
-    (| <var v>
-       <compound _ <join _ <cons (occur v) _>>>)))
 
 (define $occur-prop
   (pattern-function [$v]
@@ -99,15 +61,6 @@
   (lambda [$x]
     (unique (match-all x clause
               [[_ <cons <lit _ (occur-prop $v)>_ >] v]))))
-
-(define $tsubst
-  (match-lambda [something term]
-    {[[$u <var $n>]
-       (match u (multiset [integer term])
-         {[<cons [,n $t] _> t] ; subst規則があればsubst
-          [_ <Var n>]})]       ; なければそのまま
-     [[$u <compound $f $xs>]
-       <Compound f (map (tsubst u $1) xs)>]}))
 
 (define $psubst
   (match-lambda [something prop]
@@ -127,25 +80,6 @@
 (define $csubst
   (match-lambda [something clause]
     {[[$u [$b $ls]] [b (csubst' u ls)]]}))
-
-; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
-(define $unify
-  (match-lambda (unordered-pair term)
-    {[<pair <var $x> <var ,x>>
-      (Just {})] ; 成功(空の代入を返す)
-     [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
-      (Just {[x t]})] ; 代入[t/x]を返す
-     [<pair <compound $f <nil>> <compound ,f <nil>>>
-      (Just {})] ; 成功
-     [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
-      (match (unify x y) (list something)
-       {[,{} Nothing] ; unifyがすでに失敗している
-        [<cons $u1 <nil>> ; unifiableな場合、単一化子をsingletonから取り出す
-         (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
-                (list something)
-          {[,{} Nothing] ; 失敗
-           [<cons $u2 <nil>> (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
-     [_ Nothing]}))
 
 ; unify propositions (only predicates)
 (define $punify
@@ -440,3 +374,36 @@
 (define $solve  (make-solve resolution))
 (define $psolve (make-solve presolution))
 (define $ssolve (make-solve sresolution))
+
+;;==============================================================================
+
+(define $show-prop
+  (match-lambda prop
+    {[<pred $f ,{}> f]
+     [<pred $f $xs>
+       (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
+     [<equation $x $y>
+       (append-strings {(show-term x) " = " (show-term y)})]
+    }))
+
+(define $show-lit
+  (match-lambda literal
+    {[<lit ,1  $t> (show-prop t)]
+     [<lit ,-1 $t> (append-string "~" (show-prop t))]}))
+
+(define $show-clause
+  (match-lambda clause
+    {[[_ $cls]
+              (let {[$x (concat-strings (map show-lit cls) ", ")]}
+                (append-strings {"{" x "}"}))]
+     }))
+
+(define $show-clauses
+  (lambda [$clss]
+    (let {[$x (concat-strings (map show-clause clss) "\n ")]}
+      (append-strings {"{" x "}"}))))
+
+(define $debug-c
+  (macro [$expr]
+    (io (do {[(print (show-clauses expr))]}
+          (return expr)))))

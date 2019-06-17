@@ -4,9 +4,6 @@
     {[<pair $ $> [m m] {[[$x $y] {[x y] [y x]}]}]
      [$ [something] {[$tgt {tgt}]}]})))
 
-(define $positive?
-  (gt? x $1))
-
 (define $unique
   (match-all-lambda (list eq)
     [<join _ <cons $z !<join _ <cons ,z _>>>> z]))
@@ -36,54 +33,3 @@
          [<join _ <cons $x !<nil>>> (append-string x sep)]
          [<join _ <cons $x <nil>>> x]
          }))))
-
-(define $show-term
-  (match-lambda term
-    {[<var ,0> "x"]
-     [<var ,1> "y"]
-     [<var ,2> "z"]
-     [<var ,3> "w"]
-     [<var $x> (append-strings {"x" (show x)})]
-     [<compound $f ,{}> f]
-     [<compound ,"+" <cons (& <compound ,"+" _> $x) <cons $y <nil>>>>
-       (append-strings {"(" (show-term x) ") + " (show-term y)})]
-     [<compound ,"+" <cons $x <cons $y <nil>>>>
-       (append-strings {(show-term x) " + " (show-term y)})]
-     [<compound ,"*" <cons (& <compound ,"*" _> $x) <cons $y <nil>>>>
-       (append-strings {"(" (show-term x) ") * " (show-term y)})]
-     [<compound ,"*" <cons $x <cons $y <nil>>>>
-       (append-strings {(show-term x) " * " (show-term y)})]
-     [<compound $f $xs>
-       (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
-    }))
-
-(define $show-prop
-  (match-lambda prop
-    {[<pred $f ,{}> f]
-     [<pred $f $xs>
-       (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
-     [<equation $x $y>
-       (append-strings {(show-term x) " = " (show-term y)})]
-    }))
-
-(define $show-lit
-  (match-lambda literal
-    {[<lit ,1  $t> (show-prop t)]
-     [<lit ,-1 $t> (append-string "~" (show-prop t))]}))
-
-(define $show-clause
-  (match-lambda clause
-    {[[_ $cls]
-              (let {[$x (concat-strings (map show-lit cls) ", ")]}
-                (append-strings {"{" x "}"}))]
-     }))
-
-(define $show-clauses
-  (lambda [$clss]
-    (let {[$x (concat-strings (map show-clause clss) "\n ")]}
-      (append-strings {"{" x "}"}))))
-
-(define $debug-c
-  (macro [$expr]
-    (io (do {[(print (show-clauses expr))]}
-          (return expr)))))

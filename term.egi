@@ -1,0 +1,92 @@
+; term-related definition
+
+(load-file "utils.egi")
+
+(define $term
+  (matcher
+    {[<var $> integer
+      {[<Var $i> {i}]
+       [_ {}]}]
+     ; 関数適用
+     [<compound $ $> [string (list term)]
+      {[<Compound $s $l> {[s l]}]
+       [_ {}]}]
+     [<unify ,$t $> something
+      {[$s (match (unify t s) (maybe something)
+            {[(just $sigma) {sigma}]
+             [(nothing)     {}]
+            })]}]
+     [<subterm $ $> [term something]
+      {[$s (subterm s)]}]
+     [$ something
+      {[$tgt {tgt}]}]}))
+
+(define $var (lambda $n <Var n>))
+
+(define $app
+  (cambda $xs
+    (match xs (list something)
+      {[<cons $x $xs> <Compound x xs>]})))
+
+(define $tsubst
+  (match-lambda [something term]
+    {[[$u <var $n>]
+       (match u (multiset [integer term])
+         {[<cons [,n $t] _> t] ; subst規則があればsubst
+          [_ <Var n>]})]       ; なければそのまま
+     [[$u <compound $f $xs>]
+       <Compound f (map (tsubst u $1) xs)>]}))
+
+;; term -> {term, term -> term}
+(define $subterm
+  (match-all-lambda term
+    {[<compound $f <join $xs <cons <subterm $x $env> $xs'>>>
+       (let {[$env' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
+         [x (compose env' env)])]
+     [$t [t id]]}))
+
+(define $occur
+  (pattern-function [$v]
+    (| <var v>
+       <compound _ <join _ <cons (occur v) _>>>)))
+
+; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
+(define $unify
+  (match-lambda (unordered-pair term)
+    {[<pair <var $x> <var ,x>>
+      (Just {})] ; 成功(空の代入を返す)
+     [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
+      (Just {[x t]})] ; 代入[t/x]を返す
+     [<pair <compound $f <nil>> <compound ,f <nil>>>
+      (Just {})] ; 成功
+     [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
+      (match (unify x y) (list something)
+       {[,{} Nothing] ; unifyがすでに失敗している
+        [<cons $u1 <nil>> ; unifiableな場合、単一化子をsingletonから取り出す
+         (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
+                (list something)
+          {[,{} Nothing] ; 失敗
+           [<cons $u2 <nil>> (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
+     [_ Nothing]}))
+
+;;==============================================================================
+
+(define $show-term
+  (match-lambda term
+    {[<var ,0> "x"]
+     [<var ,1> "y"]
+     [<var ,2> "z"]
+     [<var ,3> "w"]
+     [<var $x> (append-strings {"x" (show x)})]
+     [<compound $f ,{}> f]
+     [<compound ,"+" <cons (& <compound ,"+" _> $x) <cons $y <nil>>>>
+       (append-strings {"(" (show-term x) ") + " (show-term y)})]
+     [<compound ,"+" <cons $x <cons $y <nil>>>>
+       (append-strings {(show-term x) " + " (show-term y)})]
+     [<compound ,"*" <cons (& <compound ,"*" _> $x) <cons $y <nil>>>>
+       (append-strings {"(" (show-term x) ") * " (show-term y)})]
+     [<compound ,"*" <cons $x <cons $y <nil>>>>
+       (append-strings {(show-term x) " * " (show-term y)})]
+     [<compound $f $xs>
+       (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
+    }))

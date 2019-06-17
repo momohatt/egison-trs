@@ -1,9 +1,5 @@
 (load-file "resolution.egi")
 
-(define $x (var 0))
-(define $y (var 1))
-(define $z (var 2))
-(define $w (var 3))
 ; P(g(x), y)
 (define $t1 (pred "P" (app "g" x) y))
 ; P(g(g(c)), c)

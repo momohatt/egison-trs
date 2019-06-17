@@ -1,0 +1,71 @@
+; Implementation of term rewriting system in Egison
+
+(load-file "term.egi")
+
+(define $equation
+  (matcher
+    {[<equation $ $> [term term]
+      {[<Equation $l $r> {[l r]}]
+       [_ {}]}]
+     [$ something
+      {[$tgt {tgt}]}]
+     }))
+
+(define $eql (lambda [$x $y] <Equation x y>))
+
+(define $rewrite
+  (match-all-lambda [(multiset term) (multiset equation)]
+    {[[<cons <subterm $tgt $context> _>
+       <cons <equation <unify ,tgt $sigma> $r> _>]
+      (context (tsubst sigma r))
+      ]
+     }))
+
+(define $rewrite-loop
+  (match-lambda [term (multiset term) (multiset term)]
+    {[[$goal <cons ,goal _> _]
+      <FINISH>]
+     [[_ <nil> _]
+      <REFUTE>]
+     [[$goal $tgt $axiom]
+      (rewrite-loop goal (debug-term-set (rewrite tgt axiom)) axiom)]
+     }))
+
+(define $solve
+  (match-lambda [equation (multiset equation)]
+    {[[<equation $l $r> $axiom] (rewrite-loop r {l} axiom)]
+     }))
+
+;;==============================================================================
+
+(define $show-equation
+  (match-lambda equation
+    {[<equation $x $y>
+       (append-strings {(show-term x) " = " (show-term y)})]
+    }))
+
+(define $show-term-set
+  (lambda [$tms]
+    (let {[$x (concat-strings (map show-term tms) ", ")]}
+      (append-strings {"{" x "}"}))))
+
+(define $debug-term-set
+  (macro [$tms]
+    (io (do {[(print (show-term-set tms))]}
+          (return tms)))))
+
+(define $zero  (app "O"))
+(define $one   (app "S" (app "O")))
+(define $two   (app "S" (app "S" (app "O"))))
+(define $three (app "S" (app "S" (app "S" (app "O")))))
+(define $four  (app "S" (app "S" (app "S" (app "S" (app "O"))))))
+
+(define $axioms-of-nat
+   ; O + x = x
+  {(eql (app "+" zero x) x)
+   ; S(m) + n = m + S(n)
+   (eql (app "+" (app "S" x) y) (app "+" x (app "S" y)))
+   })
+
+(define $p7 (eql (app "+" one two) three))
+(define $p8 (eql (app "+" zero two) two))

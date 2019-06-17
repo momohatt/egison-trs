@@ -50,6 +50,10 @@
     (| <var v>
        <compound _ <join _ <cons (occur v) _>>>)))
 
+(define $fv
+  (match-all-lambda term
+    {[(occur $v) v]}))
+
 ; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
 (define $unify
   (match-lambda (unordered-pair term)
@@ -71,10 +75,18 @@
 
 ;;==============================================================================
 
+; variables
 (define $x (var 0))
 (define $y (var 1))
 (define $z (var 2))
 (define $w (var 3))
+
+; constants
+(define $a (app "a"))
+(define $b (app "b"))
+(define $c (app "c"))
+(define $d (app "d"))
+
 (define $show-term
   (match-lambda term
     {[<var ,0> "x"]

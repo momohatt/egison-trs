@@ -5,7 +5,7 @@
 (define $equation
   (matcher
     {[<equation $ $> [term term]
-      {[<Equation $l $r> {[l r]}]
+      {[<Equation $l $r> {[l r] [r l]}]
        [_ {}]}]
      [$ something
       {[$tgt {tgt}]}]
@@ -13,13 +13,23 @@
 
 (define $eql (lambda [$x $y] <Equation x y>))
 
+(define $instantiate
+  (lambda [$tm]
+    (tsubst (instantiate' tm (fv tm)) tm)))
+(define $instantiate'
+  (match-all-lambda [term (list something)]
+    {[[$tm <join $xs <cons $x _>>]
+      [x <Compound (append-string "c" (show (length xs))) {}>]]}))
+
 (define $rewrite
-  (match-all-lambda [(multiset term) (multiset equation)]
-    {[[<cons <subterm $tgt $context> _>
-       <cons <equation <unify ,tgt $sigma> $r> _>]
-      (context (tsubst sigma r))
-      ]
-     }))
+  (lambda [$tgt $axiom]
+    (unique
+      (match-all [tgt axiom] [(multiset term) (multiset equation)]
+        {[[<cons <subterm $subtm $context> _>
+                 <cons <equation <unify ,subtm $sigma> $r> _>]
+          (context (instantiate (tsubst sigma r)))
+          ]
+        }))))
 
 (define $rewrite-loop
   (match-lambda [term (multiset term) (multiset term)]
@@ -46,13 +56,75 @@
 
 (define $show-term-set
   (lambda [$tms]
-    (let {[$x (concat-strings (map show-term tms) ", ")]}
+    (let {[$x (concat-strings (map show-term tms) ",\n ")]}
       (append-strings {"{" x "}"}))))
 
 (define $debug-term-set
   (macro [$tms]
     (io (do {[(print (show-term-set tms))]}
           (return tms)))))
+
+;;==============================================================================
+
+(define $p (app "*" $1 $2)) ; product
+(define $i (app "i" $1))    ; inverse
+(define $e (app "e"))       ; 単位元
+
+(define $a' (i a))
+(define $b' (i b))
+(define $c' (i c))
+(define $d' (i d))
+
+(define $x' (i x))
+(define $y' (i y))
+(define $z' (i z))
+(define $w' (i w))
+
+(define $axioms-of-groups
+  {(eql (p (p x y) z) (p x (p y z)))
+   (eql (p x x') e)
+   (eql (p x e) x)
+  })
+
+(define $axioms-of-groups-complete
+  {@axioms-of-groups
+   (eql (i (p y x)) (p x' y'))
+   (eql (p y' (p y x)) x)
+   (eql (p x' x) e)
+   (eql (i e) e)
+   (eql (i x') x)
+   (eql (p e x) x)
+   (eql (p x (p x' y)) y)
+  })
+
+; (a * a')' = e
+(define $g1' (i (p a a')))
+(define $g1 (eql g1' e))
+
+; (((b * c) * d)' * b)' * d' = c
+(define $g2' (p (i (p (i (p (p b c) d)) b))
+                (i d)))
+(define $g2 (eql g2' c))
+; (((b * c) * d)' * b)' * d'
+; = (d' * (b * c)' * b)' * d'
+; = (d' * c' * b' * b)' * d'
+; = (d' * c' * e)' * d'
+; = (d' * c')' * d'
+; = c'' * d'' * d'
+; = c'' * d * d'
+; = c'' * e
+; = c * e
+; = c
+
+(define $g3 (eql (p g1' g2') c))
+
+; e * a = a
+(define $g4 (eql (p e a) a))
+
+; a' * a = e
+(define $g5 (eql (p a' a) e))
+
+;;==============================================================================
 
 (define $zero  (app "O"))
 (define $one   (app "S" (app "O")))

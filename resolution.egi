@@ -12,7 +12,10 @@
       {[<Equation $l $r> {[l r] [r l]}] ; unordered-pairのように
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (punify t s)]}]
+      {[$s (match (punify t s) (maybe something)
+            {[(just $sigma) {sigma}]
+             [(nothing)     {}]
+             })]}]
      [<subterm $ $> [term something]
       {[$s (psubterm s)]}]
      [$ something
@@ -87,13 +90,13 @@
     {[<pair <pred $p <nil>> <pred ,p <nil>>>
       (Just {})]
      [<pair <pred $p <cons $x $xs>> <pred ,p <cons $y $ys>>>
-      (match (unify x y) (list something)
-       {[,{} Nothing]
-        [<cons $u1 <nil>>
+      (match (unify x y) (maybe something)
+       {[(nothing) Nothing]
+        [(just $u1)
          (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
-                (list something)
-          {[,{} Nothing] ; 失敗
-           [<cons $u2 <nil>> (Just {@u1 @u2})]})]})]
+                (maybe something)
+          {[(nothing) Nothing] ; 失敗
+           [(just $u2) (Just {@u1 @u2})]})]})]
      [_ Nothing]
     }))
 

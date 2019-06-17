@@ -60,13 +60,13 @@
      [<pair <compound $f <nil>> <compound ,f <nil>>>
       (Just {})] ; 成功
      [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
-      (match (unify x y) (list something)
-       {[,{} Nothing] ; unifyがすでに失敗している
-        [<cons $u1 <nil>> ; unifiableな場合、単一化子をsingletonから取り出す
+      (match (unify x y) (maybe something)
+       {[(nothing) Nothing] ; unifyがすでに失敗している
+        [(just $u1) ; unifiableな場合、単一化子をsingletonから取り出す
          (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
-                (list something)
-          {[,{} Nothing] ; 失敗
-           [<cons $u2 <nil>> (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
+                (maybe something)
+          {[(nothing) Nothing] ; 失敗
+           [(just $u2) (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
      [_ Nothing]}))
 
 ;;==============================================================================

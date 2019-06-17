@@ -58,10 +58,10 @@
 ; t1 = P(g(x), y)
 ; t2 = P(g(g(c)), c)
 (assert-equal "unify1" (unify x x) {{}})
-(assert-equal "unify2" (unify t1 z) {{[z t1]}})
+(assert-equal "unify2" (unify t1 z) {{[2 t1]}})
 ; {[x, g(c)], [y, c]}
 (assert-equal "unify3"
-  (unify-prop t1 t2)
+  (punify t1 t2)
   {{[0 <Compound "g" {<Compound "c" {}>}>] [1 <Compound "c" {}>]}})
 
 ; ========================= example (group theory) =============================

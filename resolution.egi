@@ -39,10 +39,10 @@
 ;; prop -> {term, term -> prop}
 (define $psubterm
   (match-all-lambda prop
-    {[<pred $f <join $xs <cons <subterm $x $env> $xs'>>>
-       [x (lambda [$x] <Pred f (append xs (cons (env x) xs'))>)]]
-     [<equation <subterm $x $env> $r>
-       [x (lambda [$x] <Equation (env x) r>)]]
+    {[<pred $f <join $xs <cons <subterm $x $context> $xs'>>>
+       [x (lambda [$x] <Pred f (append xs (cons (context x) xs'))>)]]
+     [<equation <subterm $x $context> $r>
+       [x (lambda [$x] <Equation (context x) r>)]]
     }))
 
 (define $occur-prop

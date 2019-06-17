@@ -40,9 +40,9 @@
 ;; term -> {term, term -> term}
 (define $subterm
   (match-all-lambda term
-    {[<compound $f <join $xs <cons <subterm $x $env> $xs'>>>
-       (let {[$env' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
-         [x (compose env' env)])]
+    {[<compound $f <join $xs <cons <subterm $x $context> $xs'>>>
+       (let {[$context' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
+         [x (compose context' context)])]
      [$t [t id]]}))
 
 (define $occur

@@ -252,10 +252,10 @@ $S$にreflexivityとfunctional reflexivityを加えたものからparamodulation
 ;; term -> {term, term -> term}
 (define $subterm
   (match-all-lambda term
-    {[<compound $f <join $xs <cons <subterm $x $env> $xs'>>>
-       (let {[$env'
+    {[<compound $f <join $xs <cons <subterm $x $context> $xs'>>>
+       (let {[$context'
               (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
-         [x (compose env' env)])]
+         [x (compose context' context)])]
      [$t [t id]]}))
     \end{minted}
   \end{block}
@@ -269,10 +269,10 @@ $S$にreflexivityとfunctional reflexivityを加えたものからparamodulation
      ; paramodulation
     {[<cons <cons <lit ,1 <equation $s $t>> $xs>
        <cons <cons <lit $sign
-           ; env[s'], s'は変数でない, sigma = mgu(s, s')
-           |\colorbox{yellow}{<subterm (& !<var \_> <unify ,s \$sigma> \$s') \$env>}|> $ys>
+           ; context[s'], s'は変数でない, sigma = mgu(s, s')
+           |\colorbox{yellow}{<subterm (& !<var \_> <unify ,s \$sigma> \$s') \$context>}|> $ys>
          _>>
-      (csubst sigma {@xs @ys <Lit sign |\colorbox{yellow}{(env t)}|>})
+      (csubst sigma {@xs @ys <Lit sign |\colorbox{yellow}{(context t)}|>})
      ]
      ; 普通のresolution
      [<cons <cons <lit ,1 $t> $xs>

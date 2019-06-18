@@ -42,7 +42,7 @@
   (match-all-lambda term
     {[<compound $f <join $xs <cons <subterm $x $context> $xs'>>>
        (let {[$context' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
-         [x (compose context' context)])]
+         [x (compose context context')])]
      [$t [t id]]}))
 
 (define $occur
@@ -54,7 +54,6 @@
   (match-all-lambda term
     {[(occur $v) v]}))
 
-; 失敗なら{}、成功なら{単一化子}を返す(optional型の気持ち)
 (define $unify
   (match-lambda (unordered-pair term)
     {[<pair <var $x> <var ,x>>

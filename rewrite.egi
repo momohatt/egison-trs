@@ -5,7 +5,7 @@
 (define $equation
   (matcher
     {[<equation $ $> [term term]
-      {[<Equation $l $r> {[l r] [r l]}]
+      {[<Equation $l $r> {[l r]}] ; rewrite should be oriented left-to-right
        [_ {}]}]
      [$ something
       {[$tgt {tgt}]}]
@@ -13,30 +13,22 @@
 
 (define $eql (lambda [$x $y] <Equation x y>))
 
-(define $instantiate
-  (lambda [$tm]
-    (tsubst (instantiate' tm (fv tm)) tm)))
-(define $instantiate'
-  (match-all-lambda [term (list something)]
-    {[[$tm <join $xs <cons $x _>>]
-      [x <Compound (append-string "c" (show (length xs))) {}>]]}))
-
 (define $rewrite
   (lambda [$tgt $axiom]
     (unique
       (match-all [tgt axiom] [(multiset term) (multiset equation)]
         {[[<cons <subterm $subtm $context> _>
                  <cons <equation <unify ,subtm $sigma> $r> _>]
-          (context (instantiate (tsubst sigma r)))
+          (context (tsubst sigma r))
           ]
         }))))
 
 (define $rewrite-loop
   (match-lambda [term (multiset term) (multiset term)]
     {[[$goal <cons ,goal _> _]
-      <FINISH>]
+      <PROVEN>]
      [[_ <nil> _]
-      <REFUTE>]
+      <REFUTED>]
      [[$goal $tgt $axiom]
       (rewrite-loop goal (debug-term-set (rewrite tgt axiom)) axiom)]
      }))
@@ -58,6 +50,11 @@
   (lambda [$tms]
     (let {[$x (concat-strings (map show-term tms) ",\n ")]}
       (append-strings {"{" x "}"}))))
+
+(define $debug-term
+  (macro [$tm]
+    (io (do {[(print (show-term tm))]}
+          (return tm)))))
 
 (define $debug-term-set
   (macro [$tms]
@@ -82,28 +79,32 @@
 
 (define $axioms-of-groups
   {(eql (p (p x y) z) (p x (p y z)))
-   (eql (p x x') e)
-   (eql (p x e) x)
+   (eql (p x x') e)            ; x * x' = e
+   (eql (p x e) x)             ; x * e = x
   })
 
 (define $axioms-of-groups-complete
   {@axioms-of-groups
-   (eql (i (p y x)) (p x' y'))
-   (eql (p y' (p y x)) x)
-   (eql (p x' x) e)
-   (eql (i e) e)
-   (eql (i x') x)
-   (eql (p e x) x)
-   (eql (p x (p x' y)) y)
+   (eql (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
+   (eql (p y' (p y x)) x)      ; y' * (y * x) = x
+   (eql (p x' x) e)            ; x' * x = e
+   (eql (i e) e)               ; e' = e
+   (eql (i x') x)              ; x'' = x
+   (eql (p e x) x)             ; e * x = x
+   (eql (p x (p x' y)) y)      ; x * (x' * y) = y
   })
 
 ; (a * a')' = e
 (define $g1' (i (p a a')))
+; <PROVEN> with
+;  (solve g1 axioms-of-groups-complete)
 (define $g1 (eql g1' e))
 
 ; (((b * c) * d)' * b)' * d' = c
 (define $g2' (p (i (p (i (p (p b c) d)) b))
                 (i d)))
+; <PROVEN> with
+;  (solve g2 axioms-of-groups-complete)
 (define $g2 (eql g2' c))
 ; (((b * c) * d)' * b)' * d'
 ; = (d' * (b * c)' * b)' * d'
@@ -116,6 +117,7 @@
 ; = c * e
 ; = c
 
+; difficult...
 (define $g3 (eql (p g1' g2') c))
 
 ; e * a = a

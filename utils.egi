@@ -16,7 +16,9 @@
                    [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
       (loop-fn xs {}))))
 
-(unique-unordered-pair {[1 2] [2 1]})
+(assert-equal "unique-unordered-pair"
+  (unique-unordered-pair {[1 2] [2 1]})
+  {[1 2]})
 
 (define $compare-c/fn
   (lambda [$ord $c1 $c2]
@@ -32,6 +34,12 @@
 (define $col-show/fn
   (lambda [$show $set]
     (S.concat {"{" (S.intercalate ",\n " (map show set)) "}"})))
+
+(define $pair-show/fn
+  (match-lambda [something [something something]]
+    {[[$show [$s $t]]
+      (S.concat {"[" (show s) ", " (show t) "]"})]
+     [[_ $p] (show p)]}))
 
 (define $debug/fn
   (macro [$show $x]

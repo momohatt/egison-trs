@@ -35,7 +35,6 @@
         }))))
 
 ; term -> {equation} -> term
-; suitable for confluent TRS.
 (define $normalize
   (match-lambda [term (multiset equation)]
     {[[<subterm $subtm $context>
@@ -93,12 +92,10 @@
     }))
 
 (define $show-equations
-  (lambda [$eqs] (col-show/fn show-equation eqs)))
+  (col-show/fn show-equation $1))
 
 (define $show-term-pairs
-  (match-all-lambda (multiset [term term])
-    [<cons [$t1 $t2] _>
-     (S.concat {"[" (show-term t1) ", " (show-term t2) "]"})]))
+  (col-show/fn (pair-show/fn show-term $1) $1))
 
 ;;==============================================================================
 

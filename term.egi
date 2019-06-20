@@ -107,5 +107,4 @@
     }))
 
 (define $show-terms
-  (lambda [$tms]
-    (col-show/fn show-term tms)))
+  (col-show/fn show-term $1))

@@ -394,11 +394,8 @@
 (define $show-clause
   (match-lambda clause
     {[[_ $cls]
-              (let {[$x (S.intercalate ", " (map show-lit cls))]}
-                (S.concat {"{" x "}"}))]
+      (S.concat {"{" (S.intercalate ", " (map show-lit cls)) "}"})]
      }))
 
 (define $show-clauses
-  (lambda [$clss]
-    (let {[$x (S.intercalate "\n " (map show-clause clss))]}
-      (S.concat {"{" x "}"}))))
+  (col-show/fn show-clause $1))

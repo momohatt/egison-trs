@@ -369,7 +369,7 @@
          (if (include?/m clause p q) ; q \subseteq? p
            <SATURATED>
            (let {[$r (trim-clause {@p @q})]}
-             ((make-solve resol) (debug-c r)))))]})))
+             ((make-solve resol) (debug/fn show-clauses r)))))]})))
 
 (define $solve  (make-solve resolution))
 (define $psolve (make-solve presolution))
@@ -402,8 +402,3 @@
   (lambda [$clss]
     (let {[$x (S.intercalate "\n " (map show-clause clss))]}
       (S.concat {"{" x "}"}))))
-
-(define $debug-c
-  (macro [$expr]
-    (io (do {[(print (show-clauses expr))]}
-          (return expr)))))

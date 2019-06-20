@@ -105,3 +105,7 @@
      [<compound $f $xs>
        (S.concat {f "(" (S.intercalate ", " (map show-term xs)) ")"})]
     }))
+
+(define $show-terms
+  (lambda [$tms]
+    (col-show/fn show-term tms)))

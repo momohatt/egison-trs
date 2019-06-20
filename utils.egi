@@ -28,3 +28,12 @@
        [[<cons $x _> <cons $y _>] (ord x y)]})))
 
 (define $neq? (lambda [$x $y] (not (eq? x y))))
+
+(define $col-show/fn
+  (lambda [$show $set]
+    (S.concat {"{" (S.intercalate ",\n " (map show set)) "}"})))
+
+(define $debug/fn
+  (macro [$show $x]
+    (io (do {[(print (show x))]}
+          (return x)))))

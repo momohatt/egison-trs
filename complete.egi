@@ -1,11 +1,11 @@
-; Implementation of term rewriting system in Egison
+; Implementation of _complete_ term rewriting system in Egison
 
 (load-file "term.egi")
 
 (define $equation
   (matcher
     {[<equation $ $> [term term]
-      {[<Equation $l $r> {[l r] [r l]}] ; like the unordered-pair
+      {[<Equation $l $r> {[l r]}] ; rewrite should be oriented left-to-right
        [_ {}]}]
      [$ something
       {[$tgt {tgt}]}]
@@ -24,7 +24,7 @@
     {[[$u <equation $l $r>] <Equation (tsubst u l) (tsubst u r)>]}))
 
 ; {term} -> {equation} -> {term}
-(define $rewrite
+(define $rewrite-all
   (lambda [$tgt $axiom]
     (unique
       (match-all [tgt axiom] [(multiset term) (multiset equation)]
@@ -33,6 +33,16 @@
           (context (tsubst sigma r))
           ]
         }))))
+
+; term -> {equation} -> term
+; suitable for confluent TRS.
+(define $normalize
+  (match-lambda [term (multiset equation)]
+    {[[<subterm $subtm $context>
+       (& <cons <equation <unify ,subtm $sigma> $r> _> $axioms)]
+      (normalize (context (tsubst sigma r)) axioms)]
+     [[$t _] t]
+     }))
 
 (define $rewrite-loop
   (match-lambda [term (multiset term) (multiset term)]
@@ -48,6 +58,31 @@
   (match-lambda [equation (multiset equation)]
     {[[<equation $l $r> $axiom] (rewrite-loop r {l} axiom)]
      }))
+
+;;======================= Knuth-Bendix completion ==============================
+
+; rename free variables of each axioms so that they don't collide
+(define $rename-problem
+  (match-lambda [integer (list equation)]
+    {[[$n <nil>]
+      {}]
+     [[$n <cons $e $es>]
+      (let {[$u (zip (efv e)
+                     ; n, n+1, ... の新しいvarを生成
+                     (map (lambda $x <Var x>) (from n)))]}
+        (cons (esubst u e)
+              (rename-problem (+ n (length u)) es)))]}))
+
+(define $critical-pairs
+  (lambda [$axioms]
+    (unique-unordered-pair
+      (match-all (rename-problem 0 axioms) (multiset equation)
+        {[<cons <equation $l2 $r2>
+          <cons <equation
+                  <subterm (& !<var _> <unify ,l2 $sigma>) $context>
+                  $r1> _>>
+          [(tsubst sigma r1) (tsubst sigma (context r2))]
+        ]}))))
 
 ;;==============================================================================
 
@@ -100,15 +135,11 @@
 
 ; (a * a')' = e
 (define $g1' (i (p a a')))
-; <PROVEN> with
-;  (solve g1 axioms-of-groups-complete)
 (define $g1 (eql g1' e))
 
 ; (((b * c) * d)' * b)' * d' = c
 (define $g2' (p (i (p (i (p (p b c) d)) b))
                 (i d)))
-; <PROVEN> with
-;  (solve g2 axioms-of-groups-complete)
 (define $g2 (eql g2' c))
 ; (((b * c) * d)' * b)' * d'
 ; = (d' * (b * c)' * b)' * d'
@@ -121,7 +152,6 @@
 ; = c * e
 ; = c
 
-; difficult...
 (define $g3 (eql (p g1' g2') c))
 
 ; e * a = a
@@ -147,3 +177,7 @@
 
 (define $p7 (eql (app "+" one two) three))
 (define $p8 (eql (app "+" zero two) two))
+
+(assert-equal "normalize"
+  (normalize (app "+" one two) axioms-of-nat)
+  three)

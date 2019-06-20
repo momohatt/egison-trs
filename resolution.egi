@@ -326,7 +326,7 @@
      }))
 
 ; (io (do
-;   {[(print (append-strings {(show-term t) " & ~" (show-term s)}))]
+;   {[(print (S.concat {(show-term t) " & ~" (show-term s)}))]
 ;    [(print (show sigma))]
 ;    [(print (show-clause {@(csubst sigma xs) @(csubst sigma ys)}))]
 ;   }
@@ -381,9 +381,9 @@
   (match-lambda prop
     {[<pred $f ,{}> f]
      [<pred $f $xs>
-       (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
+       (S.concat {f "(" (S.intercalate ", " (map show-term xs)) ")"})]
      [<equation $x $y>
-       (append-strings {(show-term x) " = " (show-term y)})]
+       (S.concat {(show-term x) " = " (show-term y)})]
     }))
 
 (define $show-lit
@@ -394,14 +394,14 @@
 (define $show-clause
   (match-lambda clause
     {[[_ $cls]
-              (let {[$x (concat-strings (map show-lit cls) ", ")]}
-                (append-strings {"{" x "}"}))]
+              (let {[$x (S.intercalate ", " (map show-lit cls))]}
+                (S.concat {"{" x "}"}))]
      }))
 
 (define $show-clauses
   (lambda [$clss]
-    (let {[$x (concat-strings (map show-clause clss) "\n ")]}
-      (append-strings {"{" x "}"}))))
+    (let {[$x (S.intercalate "\n " (map show-clause clss))]}
+      (S.concat {"{" x "}"}))))
 
 (define $debug-c
   (macro [$expr]

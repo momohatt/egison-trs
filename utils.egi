@@ -28,18 +28,3 @@
        [[<cons $x _> <cons $y _>] (ord x y)]})))
 
 (define $neq? (lambda [$x $y] (not (eq? x y))))
-
-; ============================== pretty printing ===============================
-
-(define $append-strings
-  (lambda [$strs]
-    (foldl (lambda [$acc $x] (append-string acc x)) "" strs)))
-
-(define $concat-strings
-  (lambda [$strs $sep]
-    (append-strings
-      (match-all strs (list string)
-        {[<nil> ""]
-         [<join _ <cons $x !<nil>>> (append-string x sep)]
-         [<join _ <cons $x <nil>>> x]
-         }))))

@@ -77,12 +77,12 @@
 
 (define $map-show
   (lambda [$show $set]
-    (append-strings {"{" (concat-strings (map show set) ",\n ") "}"})))
+    (S.concat {"{" (S.intercalate ",\n " (map show set)) "}"})))
 
 (define $show-equation
   (match-lambda equation
     {[<equation $x $y>
-       (append-strings {(show-term x) " = " (show-term y)})]
+       (S.concat {(show-term x) " = " (show-term y)})]
     }))
 
 (define $show-equations
@@ -91,7 +91,7 @@
 (define $show-term-pairs
   (match-all-lambda (multiset [term term])
     [<cons [$t1 $t2] _>
-     (append-strings {"[" (show-term t1) ", " (show-term t2) "]"})]))
+     (S.concat {"[" (show-term t1) ", " (show-term t2) "]"})]))
 
 (define $show-terms
   (lambda [$tms]

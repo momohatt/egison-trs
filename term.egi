@@ -92,16 +92,16 @@
      [<var ,1> "y"]
      [<var ,2> "z"]
      [<var ,3> "w"]
-     [<var $x> (append-strings {"x" (show x)})]
+     [<var $x> (S.concat {"x" (show x)})]
      [<compound $f ,{}> f]
      [<compound ,"+" <cons (& <compound ,"+" _> $x) <cons $y <nil>>>>
-       (append-strings {"(" (show-term x) ") + " (show-term y)})]
+       (S.concat {"(" (show-term x) ") + " (show-term y)})]
      [<compound ,"+" <cons $x <cons $y <nil>>>>
-       (append-strings {(show-term x) " + " (show-term y)})]
+       (S.concat {(show-term x) " + " (show-term y)})]
      [<compound ,"*" <cons (& <compound ,"*" _> $x) <cons $y <nil>>>>
-       (append-strings {"(" (show-term x) ") * " (show-term y)})]
+       (S.concat {"(" (show-term x) ") * " (show-term y)})]
      [<compound ,"*" <cons $x <cons $y <nil>>>>
-       (append-strings {(show-term x) " * " (show-term y)})]
+       (S.concat {(show-term x) " * " (show-term y)})]
      [<compound $f $xs>
-       (append-strings {f "(" (concat-strings (map show-term xs) ", ") ")"})]
+       (S.concat {f "(" (S.intercalate ", " (map show-term xs)) ")"})]
     }))

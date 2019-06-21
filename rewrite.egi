@@ -43,15 +43,10 @@
 
 (define $show-equation
   (match-lambda equation
-    {[<equation $x $y>
-       (S.concat {(show-term x) " = " (show-term y)})]
-    }))
+    {[<equation $x $y> (S.concat {(show-term x) " = " (show-term y)})]}))
 
 (define $show-equations
   (col-show/fn show-equation $1))
-
-(define $show-term-pairs
-  (col-show/fn (pair-show/fn show-term $1) $1))
 
 ;;==============================================================================
 

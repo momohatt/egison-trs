@@ -4,18 +4,6 @@
       {[<pair $ $> [m m] {[[$x $y] {[x y] [y x]}]}]
       [$ [something] {[$tgt {tgt}]}]})))
 
-; cannot be done with 'unique/m (unordered-pair something)'
-(define $unique-unordered-pair
-  (lambda [$xs]
-    (letrec {[$loop-fn
-              (lambda [$xs $ys]
-                (match [xs ys] [(list (unordered-pair something))
-                                (multiset (unordered-pair something))]
-                  {[[<nil> _] ys]
-                   [[<cons <pair $l $r> $rs> <cons <pair ,l ,r> _>] (loop-fn rs ys)]
-                   [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
-      (loop-fn xs {}))))
-
 (assert-equal "unique-unordered-pair"
   (unique-unordered-pair {[1 2] [2 1]})
   {[1 2]})

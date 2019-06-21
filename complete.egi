@@ -23,17 +23,6 @@
   (match-lambda [something equation]
     {[[$u <equation $l $r>] <Equation (tsubst u l) (tsubst u r)>]}))
 
-; {term} -> {equation} -> {term}
-(define $rewrite-all
-  (lambda [$tgt $axiom]
-    (unique
-      (match-all [tgt axiom] [(multiset term) (multiset equation)]
-        {[[<cons <subterm $subtm $context> _>
-                 <cons <equation <unify ,subtm $sigma> $r> _>]
-          (context (tsubst sigma r))
-          ]
-        }))))
-
 ; term -> {equation} -> term
 (define $normalize
   (match-lambda [term (multiset equation)]
@@ -41,21 +30,6 @@
        (& <cons <equation <unify ,subtm $sigma> $r> _> $axioms)]
       (normalize (context (tsubst sigma r)) axioms)]
      [[$t _] t]
-     }))
-
-(define $rewrite-loop
-  (match-lambda [term (multiset term) (multiset term)]
-    {[[$goal <cons ,goal _> _]
-      <PROVEN>]
-     [[_ <nil> _]
-      <REFUTED>]
-     [[$goal $tgt $axiom]
-      (rewrite-loop goal (debug/fn show-terms (rewrite tgt axiom)) axiom)]
-     }))
-
-(define $solve
-  (match-lambda [equation (multiset equation)]
-    {[[<equation $l $r> $axiom] (rewrite-loop r {l} axiom)]
      }))
 
 ;;======================= Knuth-Bendix completion ==============================
@@ -72,16 +46,49 @@
         (cons (esubst u e)
               (rename-problem (+ n (length u)) es)))]}))
 
+; cannot be done with 'unique/m (unordered-pair something)'
+(define $unique-unordered-pairs
+  (lambda [$xs]
+    (letrec {[$loop-fn
+              (lambda [$xs $ys]
+                (match [xs ys] [(list equation) (multiset equation)]
+                  {[[<nil> _] ys]
+                   [[<cons $x $rs> <cons ,x _>] (loop-fn rs ys)]
+                   [[<cons <equation $l $r> $rs> <cons <equation ,r ,l> _>]
+                      (loop-fn rs ys)]
+                   [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
+      (loop-fn xs {}))))
+
+(define $confluent-pair?
+  (match-lambda [something equation]
+    {[[$axioms <equation $s $t>]
+        (eq? (normalize s axioms) (normalize t axioms))
+      ]}))
+
+; pairs (s, t) are kept in the form of <Equation s t>
 (define $critical-pairs
   (lambda [$axioms]
-    (unique-unordered-pair
+    (unique-unordered-pairs
       (match-all (rename-problem 0 axioms) (multiset equation)
         {[<cons <equation $l2 $r2>
           <cons <equation
                   <subterm (& !<var _> <unify ,l2 $sigma>) $context>
                   $r1> _>>
-          [(tsubst sigma r1) (tsubst sigma (context r2))]
+          (eql (tsubst sigma r1) (tsubst sigma (context r2)))
         ]}))))
+
+(define $critical-pairs-non-confluent
+  (lambda [$axioms]
+    (filter (lambda [$x] (not (confluent-pair? axioms x)))
+            (debug/fn show-equations (critical-pairs axioms)))))
+
+(define $completion
+  (lambda [$axioms]
+    (match (critical-pairs-non-confluent axioms) (multiset something)
+      {[<nil> axioms]
+       [$c (completion
+             (debug/fn show-equations (union axioms c)))]
+       })))
 
 ;;==============================================================================
 

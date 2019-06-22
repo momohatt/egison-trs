@@ -46,7 +46,24 @@
         (cons (esubst u e)
               (rename-problem (+ n (length u)) es)))]}))
 
-; cannot be done with 'unique/m (unordered-pair something)'
+(define $rename-problem2
+  (match-lambda [integer (list equation) (multiset equation)]
+    {[[$n <nil> $es']
+      [{} es']]
+     [[$n <cons $e $es> <cons ,e $es'>]
+      (let {[$u (zip (efv e)
+                     ; n, n+1, ... の新しいvarを生成
+                     (map (lambda $x <Var x>) (from n)))]}
+        (let {[$r (rename-problem2 (+ n (length u)) es es')]}
+          [(cons (esubst u e) (fst r)) (cons (esubst u e) (snd r))]))]
+     [[$n <cons $e $es> $es']
+      (let {[$u (zip (efv e)
+                     ; n, n+1, ... の新しいvarを生成
+                     (map (lambda $x <Var x>) (from n)))]}
+        (let {[$r (rename-problem2 (+ n (length u)) es es')]}
+          [(cons (esubst u e) (fst r)) (snd r)]))]
+     }))
+
 (define $unique-unordered-pairs
   (lambda [$xs]
     (letrec {[$loop-fn
@@ -67,28 +84,40 @@
 
 ; pairs (s, t) are kept in the form of <Equation s t>
 (define $critical-pairs
-  (lambda [$axioms]
+  (lambda [$axioms $new-axioms]
     (unique-unordered-pairs
-      (match-all (rename-problem 0 axioms) (multiset equation)
-        {[<cons <equation $l2 $r2>
-          <cons <equation
-                  <subterm (& !<var _> <unify ,l2 $sigma>) $context>
-                  $r1> _>>
-          (eql (tsubst sigma r1) (tsubst sigma (context r2)))
-        ]}))))
+      (match-all (rename-problem2 0 axioms new-axioms)
+                 [(multiset equation) (multiset equation)]
+        {[[<cons (& $eq1 <equation $l2 $r2>) _>
+           <cons (& !,eq1
+                    <equation
+                      <subterm (& !<var _> <unify ,l2 $sigma>) $context>
+                      $r1>) _>]
+          (eql (tsubst sigma r1) (tsubst sigma (context r2)))]
+         [[<cons (& $eq1
+                    <equation
+                      <subterm (& !<var _> (later <unify ,l2 $sigma>)) $context>
+                      $r1>) _>
+           <cons (& !,eq1
+                    <equation $l2 $r2>) _>]
+          (eql (tsubst sigma r1) (tsubst sigma (context r2)))]
+         }))))
 
 (define $critical-pairs-non-confluent
-  (lambda [$axioms]
+  (lambda [$axioms $new-axioms]
     (filter (lambda [$x] (not (confluent-pair? axioms x)))
-            (debug/fn show-equations (critical-pairs axioms)))))
+            (debug/fn show-equations (critical-pairs axioms new-axioms)))))
+
+(define $completion-loop
+  (lambda [$axioms $new-axioms]
+    (match (critical-pairs-non-confluent axioms new-axioms) (multiset something)
+      {[<nil> axioms]
+       [$c (completion-loop (union axioms c)
+                            (debug/fn show-equations c))]
+       })))
 
 (define $completion
-  (lambda [$axioms]
-    (match (critical-pairs-non-confluent axioms) (multiset something)
-      {[<nil> axioms]
-       [$c (completion
-             (debug/fn show-equations (union axioms c)))]
-       })))
+  (completion-loop $1 $1))
 
 ;;==============================================================================
 

@@ -19,6 +19,12 @@
 
 (define $neq? (lambda [$x $y] (not (eq? x y))))
 
+(define $eq?/fn  (lambda [$ord $x $y] (eq? (ord x y) <Equal>)))
+(define $gt?/fn  (lambda [$ord $x $y] (eq? (ord x y) <Greater>)))
+(define $geq?/fn
+  (lambda [$ord $x $y]
+    (or (eq?/fn ord x y) (gt?/fn ord x y))))
+
 (define $col-show/fn
   (lambda [$show $set]
     (S.concat {"{" (S.intercalate ",\n " (map show set)) "}"})))

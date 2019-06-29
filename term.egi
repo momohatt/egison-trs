@@ -111,6 +111,8 @@
 (define $z (var 2))
 (define $w (var 3))
 
+(define $bottom (var -1))
+
 ; constants
 (define $a (app "a"))
 (define $b (app "b"))

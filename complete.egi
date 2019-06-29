@@ -27,10 +27,23 @@
 (define $normalize
   (match-lambda [term (multiset equation)]
     {[[<subterm $subtm $context>
-       (& <cons <equation <unify ,subtm $sigma> $r> _> $axioms)]
-      (normalize (context (tsubst sigma r)) axioms)]
+       (& <cons <equation <unify-ord ,subtm $sigma> $r> _> $axioms)]
+      (normalize (debug/fn show-term (context (tsubst sigma r))) axioms)]
      [[$t _] t]
      }))
+
+(assert-equal "normalize1"
+  (normalize (app "+" two one) axioms-of-nat)
+  three)
+(assert-equal "normalize2"
+  (normalize (p (p y y') e) axioms-of-groups)
+  e)
+(assert-equal "normalize3"
+  (normalize (p (p y z) (i (p y z))) axioms-of-groups)
+  e)
+(assert-equal "normalize 4"
+  (normalize (p e x) axioms-of-groups)
+  (p e x))
 
 ;;======================= Knuth-Bendix completion ==============================
 
@@ -79,7 +92,8 @@
 (define $confluent-pair?
   (match-lambda [something equation]
     {[[$axioms <equation $s $t>]
-        (eq? (normalize s axioms) (normalize t axioms))
+        (eq? (normalize (debug/fn show-term s) axioms)
+             (normalize (debug/fn show-term t) axioms))
       ]}))
 
 ; pairs (s, t) are kept in the form of <Equation s t>
@@ -106,18 +120,36 @@
 (define $critical-pairs-non-confluent
   (lambda [$axioms $new-axioms]
     (filter (lambda [$x] (not (confluent-pair? axioms x)))
-            (debug/fn show-equations (critical-pairs axioms new-axioms)))))
+            (critical-pairs axioms new-axioms))))
 
+; new-axioms is a subset of axioms
+; TODO: orient critical pairs in right directions so rewriting doesn't explode
 (define $completion-loop
   (lambda [$axioms $new-axioms]
-    (match (critical-pairs-non-confluent axioms new-axioms) (multiset something)
+    (match (debug/fn show-equations (critical-pairs-non-confluent axioms new-axioms)) (multiset something)
       {[<nil> axioms]
-       [$c (completion-loop (union axioms c)
-                            (debug/fn show-equations c))]
+       [$c (completion-loop (debug/fn show-equations (union axioms c))
+                            c)]
        })))
 
 (define $completion
   (completion-loop $1 $1))
+
+(define $crit1 (critical-pairs axioms-of-groups axioms-of-groups))
+; {y * i(y) * x = e * x}
+(define $c1 (critical-pairs-non-confluent axioms-of-groups axioms-of-groups))
+(define $d1 (union axioms-of-groups c1))
+; {e * i(i(x5)) = x5 * e}
+(define $crit2 (critical-pairs d1 c1))
+(define $c2 (critical-pairs-non-confluent d1 c1))
+(define $d2 (union d1 c2))
+(define $c3 (critical-pairs-non-confluent d2 c2))
+
+(show-equations (critical-pairs d2 c2))
+(define $s2
+  <Compound "*" {<Compound "e" {}> <Compound "i" {<Compound "i" {<Var 5>}>}>}>)
+(define $t2
+  <Compound "*" {<Var 5> <Compound "e" {}>}>)
 
 ;;==============================================================================
 

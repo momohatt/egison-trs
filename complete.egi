@@ -117,33 +117,38 @@
           (eql (tsubst sigma r1) (tsubst sigma (context r2)))]
          }))))
 
-(define $critical-pairs-non-confluent
+(define $orient-equation
+  (match-lambda equation
+    {[<equation $l $r>
+                (if (succ? l r) (eql l r) (eql r l))]}))
+
+(define $find-new-axioms
   (lambda [$axioms $new-axioms]
-    (filter (lambda [$x] (not (confluent-pair? axioms x)))
-            (critical-pairs axioms new-axioms))))
+    (map orient-equation
+         (filter (lambda [$x] (not (confluent-pair? axioms x)))
+                 (critical-pairs axioms new-axioms)))))
 
 ; new-axioms is a subset of axioms
 ; TODO: orient critical pairs in right directions so rewriting doesn't explode
-(define $completion-loop
+(define $complete-loop
   (lambda [$axioms $new-axioms]
-    (match (debug/fn show-equations (critical-pairs-non-confluent axioms new-axioms)) (multiset something)
+    (match (debug/fn show-equations (find-new-axioms axioms new-axioms)) (multiset something)
       {[<nil> axioms]
-       [$c (completion-loop (debug/fn show-equations (union axioms c))
-                            c)]
+       [$c (complete-loop (union axioms c) c)]
        })))
 
-(define $completion
-  (completion-loop $1 $1))
+(define $complete
+  (complete-loop $1 $1))
 
 (define $crit1 (critical-pairs axioms-of-groups axioms-of-groups))
 ; {y * i(y) * x = e * x}
-(define $c1 (critical-pairs-non-confluent axioms-of-groups axioms-of-groups))
+(define $c1 (find-new-axioms axioms-of-groups axioms-of-groups))
 (define $d1 (union axioms-of-groups c1))
 ; {e * i(i(x5)) = x5 * e}
 (define $crit2 (critical-pairs d1 c1))
-(define $c2 (critical-pairs-non-confluent d1 c1))
+(define $c2 (find-new-axioms d1 c1))
 (define $d2 (union d1 c2))
-(define $c3 (critical-pairs-non-confluent d2 c2))
+(define $c3 (find-new-axioms d2 c2))
 
 (show-equations (critical-pairs d2 c2))
 (define $s2

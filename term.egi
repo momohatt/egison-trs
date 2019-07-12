@@ -165,6 +165,7 @@
           <Less>]
        [_ <Undefined>]})))
 
+; x >? y?
 (define $succ?
   (lambda [$x $y]
     (eq? (ord-t x y) <Greater>)))

@@ -95,70 +95,7 @@
      [_ Nothing]
     }))
 
-; ================================== LPO =======================================
-
-; assumes that the two input lists have the same length
-(define $lpo?
-  (match-lambda [(list term) (list term)]
-    {[[<cons $s $sx> <cons ,s $tx>]
-        (lpo? sx tx)]
-     [[<cons $s _> <cons ?(succ? s $) _>] #t]
-     [_ #f]}))
-
-(define $terminate?
-  (lambda [$x $ts]
-    (all (succ? x $) ts)))
-
-(define $weight
-  (match-lambda string
-    {[,"O" 0]
-     [,"S" 1]
-     [,"+" 2]
-     [,"e" 1]
-     [,"a" 1]
-     [,"b" 1]
-     [,"c" 1]
-     [,"d" 1]
-     [,"*" 3]
-     [,"i" 4]
-     [_ (debug 0)]}))
-
-(define $sigord
-  (lambda [$f $g]
-    (gt? (weight f) (weight g))))
-
-; Lexicographic Path Order
-(define $ord-t
-  (lambda [$x $y]
-    (match [x y] [term term]
-      {[[_ ,x] <Equal>]
-       [[,bottom _] <Less>]
-       [[_ ,bottom] <Greater>]
-       [(| [<compound $f $ss>
-            <compound ,f
-              (& ?(lpo? ss $) ?(terminate? x $))>]
-           [<compound _ <join _ <cons ,y _>>>
-            _]
-           [<compound _ <join _ <cons $s _>>>
-            ?(succ? s $)]
-           [<compound $f _>
-            <compound ?(sigord f $) ?(terminate? x $)>])
-          <Greater>]
-       [(| [<compound $f
-              (& (later ?(lpo? ss $)) ?(terminate? y $))>
-            <compound ,f $ss>]
-           [_
-            <compound _ <join _ <cons ,x _>>>]
-           [(later ?(succ? s $))
-            <compound _ <join _ <cons $s _>>>]
-           [<compound $f ?(terminate? y $)>
-            <compound ?(sigord $ f) _>])
-          <Less>]
-       [_ <Undefined>]})))
-
-(define $succ?
-  (lambda [$x $y]
-    (eq? (ord-t x y) <Greater>)))
+; ================================ ordering ====================================
 
 (define $ord-mul
   (lambda [$ord]

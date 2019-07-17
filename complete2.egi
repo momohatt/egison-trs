@@ -4,30 +4,30 @@
 
 (define $equation
   (matcher
-    {[<equation $ $> [term term]
-      {[<Equation $l $r> {[l r]}] ; rewrite should be oriented left-to-right
+    {[<equation $ $ $> [integer term term]
+      {[<Equation $n $l $r> {[n l r]}] ; rewrite should be oriented left-to-right
        [_ {}]}]
      [$ something
       {[$tgt {tgt}]}]
      }))
 
-(define $eql (lambda [$x $y] <Equation x y>))
+(define $eql (lambda [$n $x $y] <Equation n x y>))
 
 (define $efv
   (lambda [$eq]
     (unique
       (match eq equation
-        {[<equation $l $r> (append (fv l) (fv r))]}))))
+        {[<equation _ $l $r> (append (fv l) (fv r))]}))))
 
 (define $esubst
   (match-lambda [something equation]
-    {[[$u <equation $l $r>] <Equation (tsubst u l) (tsubst u r)>]}))
+    {[[$u <equation $n $l $r>] <Equation n (tsubst u l) (tsubst u r)>]}))
 
 ; term -> {equation} -> term
 (define $normalize
   (match-lambda [term (multiset equation)]
     {[[<subterm $subtm $context>
-       (& <cons <equation <unify-ord ,subtm $sigma> $r> _> $axioms)]
+       (& <cons <equation _ <unify-ord ,subtm $sigma> $r> _> $axioms)]
       (normalize (context (tsubst sigma r)) axioms)]
      [[$t _] t]
      }))
@@ -52,7 +52,7 @@
                 (match [xs ys] [(list equation) (multiset equation)]
                   {[[<nil> _] ys]
                    [[<cons $x $rs> <cons ,x _>] (loop-fn rs ys)]
-                   [[<cons <equation $l $r> $rs> <cons <equation ,r ,l> _>]
+                   [[<cons <equation _ $l $r> $rs> <cons <equation _ ,r ,l> _>]
                       (loop-fn rs ys)]
                    [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
       (loop-fn xs {}))))
@@ -73,23 +73,28 @@
 
 (define $confluent-pair?
   (match-lambda [something equation]
-    {[[$axioms <equation $s $t>]
+    {[[$axioms <equation _ $s $t>]
         (eq? (normalize s axioms)
              (normalize t axioms))
       ]}))
 
 (define $critical-pairs'
-  (lambda [$axioms]
+  (lambda [$n $axioms]
     (unique-unordered-pairs
       (match-all (rename-problem 0 axioms) (multiset equation)
-        [<cons <equation $l1 $r1>
-         <cons <equation <subterm <unify ,l1 $sigma> $context> $r2> _>>
-         (eql (tsubst sigma r2) (tsubst sigma (context r1)))
-         ]))))
+        {[<cons <equation ,n $l1 $r1>
+          <cons <equation _ <subterm <unify ,l1 $sigma> $context> $r2> _>>
+          (eql (+ n 1) (tsubst sigma r2) (tsubst sigma (context r1)))
+          ]
+         [<cons <equation _ $l1 $r1>
+          <cons <equation ,n <subterm <unify ,l1 $sigma> $context> $r2> _>>
+          (eql (+ n 1) (tsubst sigma r2) (tsubst sigma (context r1)))
+          ]}
+        ))))
 
 (define $critical-pairs
-  (lambda [$axioms]
-    (let {[$crit (critical-pairs' axioms)]}
+  (lambda [$n $axioms]
+    (let {[$crit (critical-pairs' n axioms)]}
       (let {[$crit' (map orient-equation
                          (filter
                            (lambda [$x] (not (confluent-pair? axioms x)))
@@ -102,20 +107,23 @@
 
 (define $orient-equation
   (match-lambda equation
-    {[<equation $l $r>
-                (if (succ? l r) (eql l r) (eql r l))]}))
+    {[<equation $n $l $r>
+                (if (succ? l r) (eql n l r) (eql n r l))]}))
+
+(define $complete-loop
+  (lambda [$n $axioms]
+    (match (critical-pairs n axioms) (multiset equation)
+      {[<nil> axioms]
+       [$c (complete-loop (+ n 1) (union axioms c))]})))
 
 (define $complete
-  (lambda [$axioms]
-    (match (critical-pairs axioms) (multiset equation)
-      {[<nil> axioms]
-       [$c (complete (union axioms c))]})))
+  (complete-loop 0 $))
 
 ;;==============================================================================
 
 (define $show-equation
   (match-lambda equation
-    {[<equation $x $y> (S.concat {(show-term x) " = " (show-term y)})]}))
+    {[<equation _ $x $y> (S.concat {(show-term x) " = " (show-term y)})]}))
 
 (define $show-equations
   (col-show/fn show-equation $1))
@@ -137,30 +145,30 @@
 (define $w' (i w))
 
 (define $axioms-of-groups
-  {(eql (p (p x y) z) (p x (p y z)))
-   (eql (p x x') e)            ; x * x' = e
-   (eql (p x e) x)             ; x * e = x
+  {(eql 0 (p (p x y) z) (p x (p y z)))
+   (eql 0 (p x x') e)            ; x * x' = e
+   (eql 0 (p x e) x)             ; x * e = x
   })
 
 (define $axioms-of-groups-complete
   {@axioms-of-groups
-   (eql (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
-   (eql (p y' (p y x)) x)      ; y' * (y * x) = x
-   (eql (p x' x) e)            ; x' * x = e
-   (eql (i e) e)               ; e' = e
-   (eql (i x') x)              ; x'' = x
-   (eql (p e x) x)             ; e * x = x
-   (eql (p x (p x' y)) y)      ; x * (x' * y) = y
+   (eql 0 (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
+   (eql 0 (p y' (p y x)) x)      ; y' * (y * x) = x
+   (eql 0 (p x' x) e)            ; x' * x = e
+   (eql 0 (i e) e)               ; e' = e
+   (eql 0 (i x') x)              ; x'' = x
+   (eql 0 (p e x) x)             ; e * x = x
+   (eql 0 (p x (p x' y)) y)      ; x * (x' * y) = y
   })
 
 ; (a * a')' = e
 (define $g1' (i (p a a')))
-(define $g1 (eql g1' e))
+(define $g1 (eql 0 g1' e))
 
 ; (((b * c) * d)' * b)' * d' = c
 (define $g2' (p (i (p (i (p (p b c) d)) b))
                 (i d)))
-(define $g2 (eql g2' c))
+(define $g2 (eql 0 g2' c))
 ; (((b * c) * d)' * b)' * d'
 ; = (d' * (b * c)' * b)' * d'
 ; = (d' * c' * b' * b)' * d'
@@ -172,13 +180,13 @@
 ; = c * e
 ; = c
 
-(define $g3 (eql (p g1' g2') c))
+(define $g3 (eql 0 (p g1' g2') c))
 
 ; e * a = a
-(define $g4 (eql (p e a) a))
+(define $g4 (eql 0 (p e a) a))
 
 ; a' * a = e
-(define $g5 (eql (p a' a) e))
+(define $g5 (eql 0 (p a' a) e))
 
 ;;==============================================================================
 
@@ -190,10 +198,10 @@
 
 (define $axioms-of-nat
    ; O + x = x
-  {(eql (app "+" zero x) x)
+  {(eql 0 (app "+" zero x) x)
    ; S(m) + n = m + S(n)
-   (eql (app "+" (app "S" x) y) (app "+" x (app "S" y)))
+   (eql 0 (app "+" (app "S" x) y) (app "+" x (app "S" y)))
    })
 
-(define $p7 (eql (app "+" one two) three))
-(define $p8 (eql (app "+" zero two) two))
+(define $p7 (eql 0 (app "+" one two) three))
+(define $p8 (eql 0 (app "+" zero two) two))

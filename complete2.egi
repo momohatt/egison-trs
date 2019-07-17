@@ -1,0 +1,199 @@
+; Implementation of _complete_ term rewriting system in Egison
+
+(load-file "term.egi")
+
+(define $equation
+  (matcher
+    {[<equation $ $> [term term]
+      {[<Equation $l $r> {[l r]}] ; rewrite should be oriented left-to-right
+       [_ {}]}]
+     [$ something
+      {[$tgt {tgt}]}]
+     }))
+
+(define $eql (lambda [$x $y] <Equation x y>))
+
+(define $efv
+  (lambda [$eq]
+    (unique
+      (match eq equation
+        {[<equation $l $r> (append (fv l) (fv r))]}))))
+
+(define $esubst
+  (match-lambda [something equation]
+    {[[$u <equation $l $r>] <Equation (tsubst u l) (tsubst u r)>]}))
+
+; term -> {equation} -> term
+(define $normalize
+  (match-lambda [term (multiset equation)]
+    {[[<subterm $subtm $context>
+       (& <cons <equation <unify-ord ,subtm $sigma> $r> _> $axioms)]
+      (normalize (context (tsubst sigma r)) axioms)]
+     [[$t _] t]
+     }))
+
+(assert-equal "normalize1"
+  (normalize (app "+" two one) axioms-of-nat)
+  three)
+(assert-equal "normalize2"
+  (normalize (p (p y y') e) axioms-of-groups)
+  e)
+(assert-equal "normalize3"
+  (normalize (p (p y z) (i (p y z))) axioms-of-groups)
+  e)
+(assert-equal "normalize 4"
+  (normalize (p e x) axioms-of-groups)
+  (p e x))
+
+(define $unique-unordered-pairs
+  (lambda [$xs]
+    (letrec {[$loop-fn
+              (lambda [$xs $ys]
+                (match [xs ys] [(list equation) (multiset equation)]
+                  {[[<nil> _] ys]
+                   [[<cons $x $rs> <cons ,x _>] (loop-fn rs ys)]
+                   [[<cons <equation $l $r> $rs> <cons <equation ,r ,l> _>]
+                      (loop-fn rs ys)]
+                   [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
+      (loop-fn xs {}))))
+
+;;======================= Knuth-Bendix completion ==============================
+
+; rename free variables of each axioms so that they don't collide
+(define $rename-problem
+  (match-lambda [integer (list equation)]
+    {[[$n <nil>]
+      {}]
+     [[$n <cons $e $es>]
+      (let {[$u (zip (efv e)
+                     ; n, n+1, ... の新しいvarを生成
+                     (map (lambda $x <Var x>) (from n)))]}
+        (cons (esubst u e)
+              (rename-problem (+ n (length u)) es)))]}))
+
+(define $confluent-pair?
+  (match-lambda [something equation]
+    {[[$axioms <equation $s $t>]
+        (eq? (normalize s axioms)
+             (normalize t axioms))
+      ]}))
+
+(define $critical-pairs'
+  (lambda [$axioms]
+    (unique-unordered-pairs
+      (match-all (rename-problem 0 axioms) (multiset equation)
+        [<cons <equation $l1 $r1>
+         <cons <equation <subterm <unify ,l1 $sigma> $context> $r2> _>>
+         (eql (tsubst sigma r2) (tsubst sigma (context r1)))
+         ]))))
+
+(define $critical-pairs
+  (lambda [$axioms]
+    (let {[$crit (critical-pairs' axioms)]}
+      (let {[$crit' (map orient-equation
+                         (filter
+                           (lambda [$x] (not (confluent-pair? axioms x)))
+                           crit))]}
+        (io (do
+          {[(print (S.concat {(show (length crit)) " critical pairs generated"}))]
+           [(print (S.concat {(show (length crit')) " remained"}))]
+           [(print (show-equations crit'))]}
+           (return crit')))))))
+
+(define $orient-equation
+  (match-lambda equation
+    {[<equation $l $r>
+                (if (succ? l r) (eql l r) (eql r l))]}))
+
+(define $complete
+  (lambda [$axioms]
+    (match (critical-pairs axioms) (multiset equation)
+      {[<nil> axioms]
+       [$c (complete (union axioms c))]})))
+
+;;==============================================================================
+
+(define $show-equation
+  (match-lambda equation
+    {[<equation $x $y> (S.concat {(show-term x) " = " (show-term y)})]}))
+
+(define $show-equations
+  (col-show/fn show-equation $1))
+
+;;==============================================================================
+
+(define $p (app "*" $1 $2)) ; product
+(define $i (app "i" $1))    ; inverse
+(define $e (app "e"))       ; 単位元
+
+(define $a' (i a))
+(define $b' (i b))
+(define $c' (i c))
+(define $d' (i d))
+
+(define $x' (i x))
+(define $y' (i y))
+(define $z' (i z))
+(define $w' (i w))
+
+(define $axioms-of-groups
+  {(eql (p (p x y) z) (p x (p y z)))
+   (eql (p x x') e)            ; x * x' = e
+   (eql (p x e) x)             ; x * e = x
+  })
+
+(define $axioms-of-groups-complete
+  {@axioms-of-groups
+   (eql (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
+   (eql (p y' (p y x)) x)      ; y' * (y * x) = x
+   (eql (p x' x) e)            ; x' * x = e
+   (eql (i e) e)               ; e' = e
+   (eql (i x') x)              ; x'' = x
+   (eql (p e x) x)             ; e * x = x
+   (eql (p x (p x' y)) y)      ; x * (x' * y) = y
+  })
+
+; (a * a')' = e
+(define $g1' (i (p a a')))
+(define $g1 (eql g1' e))
+
+; (((b * c) * d)' * b)' * d' = c
+(define $g2' (p (i (p (i (p (p b c) d)) b))
+                (i d)))
+(define $g2 (eql g2' c))
+; (((b * c) * d)' * b)' * d'
+; = (d' * (b * c)' * b)' * d'
+; = (d' * c' * b' * b)' * d'
+; = (d' * c' * e)' * d'
+; = (d' * c')' * d'
+; = c'' * d'' * d'
+; = c'' * d * d'
+; = c'' * e
+; = c * e
+; = c
+
+(define $g3 (eql (p g1' g2') c))
+
+; e * a = a
+(define $g4 (eql (p e a) a))
+
+; a' * a = e
+(define $g5 (eql (p a' a) e))
+
+;;==============================================================================
+
+(define $zero  (app "O"))
+(define $one   (app "S" (app "O")))
+(define $two   (app "S" (app "S" (app "O"))))
+(define $three (app "S" (app "S" (app "S" (app "O")))))
+(define $four  (app "S" (app "S" (app "S" (app "S" (app "O"))))))
+
+(define $axioms-of-nat
+   ; O + x = x
+  {(eql (app "+" zero x) x)
+   ; S(m) + n = m + S(n)
+   (eql (app "+" (app "S" x) y) (app "+" x (app "S" y)))
+   })
+
+(define $p7 (eql (app "+" one two) three))
+(define $p8 (eql (app "+" zero two) two))

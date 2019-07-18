@@ -5,7 +5,10 @@
 (define $equation
   (matcher
     {[<equation $ $> [term term]
-      {[<Equation $l $r> {[l r]}] ; rewrite should be oriented left-to-right
+      {[<Equation $l $r> {[l r] [r l]}]
+       [_ {}]}]
+     [<dequation $ $> [term term]
+      {[<Equation $l $r> {[l r]}]
        [_ {}]}]
      [$ something
       {[$tgt {tgt}]}]
@@ -60,23 +63,10 @@
         (cons (esubst u e)
               (rename-problem (+ n (length u)) es)))]}))
 
-(define $rename-problem2
-  (match-lambda [integer (list equation) (multiset equation)]
-    {[[$n <nil> $es']
-      [{} es']]
-     [[$n <cons $e $es> <cons ,e $es'>]
-      (let {[$u (zip (efv e)
-                     ; n, n+1, ... の新しいvarを生成
-                     (map (lambda $x <Var x>) (from n)))]}
-        (let {[$r (rename-problem2 (+ n (length u)) es es')]}
-          [(cons (esubst u e) (fst r)) (cons (esubst u e) (snd r))]))]
-     [[$n <cons $e $es> $es']
-      (let {[$u (zip (efv e)
-                     ; n, n+1, ... の新しいvarを生成
-                     (map (lambda $x <Var x>) (from n)))]}
-        (let {[$r (rename-problem2 (+ n (length u)) es es')]}
-          [(cons (esubst u e) (fst r)) (snd r)]))]
-     }))
+(define $rename-problem'
+  (lambda [$axioms $eq]
+    (let {[$r (rename-problem 0 {eq @axioms})]}
+      [(cdr r) (car r)])))
 
 (define $unique-unordered-pairs
   (lambda [$xs]
@@ -90,55 +80,57 @@
                    [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
       (loop-fn xs {}))))
 
-(define $joinable?
-  (match-lambda [something equation]
-    {[[$axioms <equation $s $t>]
-        (eq? (rewrite (debug/fn show-term s) axioms)
-             (rewrite (debug/fn show-term t) axioms))
-      ]}))
-
-; pairs (s, t) are kept in the form of <Equation s t>
 (define $critical-pairs
-  (lambda [$axioms $new-axioms]
-    (unique-unordered-pairs
-      (match-all (rename-problem2 0 axioms new-axioms)
-                 [(multiset equation) (multiset equation)]
-        {[[<cons (& $eq1 <equation $l2 $r2>) _>
-           <cons (& !,eq1
-                    <equation
-                      <subterm (& !<var _> <unify ,l2 $sigma>) $context>
-                      $r1>) _>]
-          (eql (tsubst sigma r1) (tsubst sigma (context r2)))]
-         [[<cons (& $eq1
-                    <equation
-                      <subterm (& !<var _> (later <unify ,l2 $sigma>)) $context>
-                      $r1>) _>
-           <cons (& !,eq1
-                    <equation $l2 $r2>) _>]
-          (eql (tsubst sigma r1) (tsubst sigma (context r2)))]
-         }))))
-
-(define $orient-equation
-  (match-lambda equation
-    {[<equation $l $r>
-                (if (succ? l r) (eql l r) (eql r l))]}))
-
-(define $find-new-axioms
-  (lambda [$axioms $new-axioms]
-    (map orient-equation
-         (filter (lambda [$x] (not (joinable? axioms x)))
-                 (critical-pairs axioms new-axioms)))))
-
-; new-axioms is a subset of axioms
-(define $complete-loop
-  (lambda [$axioms $new-axioms]
-    (match (debug/fn show-equations (find-new-axioms axioms new-axioms)) (multiset something)
-      {[<nil> axioms]
-       [$c (complete-loop (union axioms c) c)]
+  (lambda [$axioms]
+    (match-all (rename-problem 0 axioms) (set equation)
+      {[<cons <equation $l1 $r1>
+        <cons <equation (& !,l1 <subterm <unify ,l1 $sigma> $context>) $r2> _>>
+        [(tsubst sigma r2) (tsubst sigma (context r1))]
+        ]
        })))
 
+(define $critical-pairs'
+  (lambda [$axioms $new-axiom]
+    (match-all (rename-problem' axioms new-axiom) [(multiset equation) equation]
+      {[[<cons <equation $l1 $r1> _>
+         <equation (& !,l1 <subterm <unify ,l1 $sigma> $context>) $r2>]
+        [(tsubst sigma r2) (tsubst sigma (context r1))]]
+       [[<cons <equation (later (& !,l1 <subterm <unify ,l1 $sigma> $context>)) $r2> _>
+         <equation $l1 $r1>]
+        [(tsubst sigma r2) (tsubst sigma (context r1))]]
+       })))
+
+(define $orient-equation
+  (match-lambda [term term]
+    {[[$l $r]
+      (if (succ? l r) (eql l r) (eql r l))]}))
+
+(define $complete-loop
+  (lambda [$axioms $crits]
+    (io (do
+      {[(print
+          (S.concat {(show (length axioms)) " axioms, "
+                     (show (length crits)) " pending critical pairs"}))]}
+      (return
+        (let {[$. (report axioms crits)]}
+          (match crits (list [term term])
+            {[<nil> axioms]
+             [<cons [$l $r] $crits'>
+              (let {[$l' (rewrite axioms (debug/fn show-term l))]
+                    [$r' (rewrite axioms (debug/fn show-term r))]}
+                (if (eq? l' r')
+                    (complete-loop axioms crits')
+                    (let {[$new-axiom
+                           (debug/fn show-equation (orient-equation l' r'))]}
+                      (complete-loop
+                        {@axioms new-axiom}
+                        (union crits (critical-pairs' axioms new-axiom))))))
+              ]})))))))
+
 (define $complete
-  (complete-loop $1 $1))
+  (lambda [$axioms]
+    (complete-loop axioms
+                   (critical-pairs axioms))))
 
 ;;==============================================================================
 
@@ -226,3 +218,32 @@
 
 (define $p7 (eql (app "+" one two) three))
 (define $p8 (eql (app "+" zero two) two))
+
+;;==============================================================================
+
+; small example from
+; https://github.com/mir-ikbch/compl_coq/blob/8.5/test-suite/test.v
+
+(define $op (app "*" $1 $2))
+
+; (x * y) * (y * z) = y
+(define $axioms-ikebuchi
+  {(eql (op (op x y) (op y z)) y)})
+
+; ex.
+; ((a * b) * (b * c)) * ((b * c) * c) = b * c
+
+; completion result in PLAR program:
+; [<<(x3 * x0 * x1) * x1 = x0 * x1>>; <<x1 * (x1 * x2) * x5 = x1 * x2>>;
+;  <<(x * y) * y * z = y>>]
+
+;;==============================================================================
+
+; small example from PLAR
+
+; f(f(x)) = g(x)
+(define $axioms-plar
+  {(eql (app "f" (app "f" x)) (app "g" x))})
+
+; completion result:
+; f(g(x)) = g(f(x)), g(x) = g(x)

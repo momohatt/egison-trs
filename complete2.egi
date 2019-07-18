@@ -74,11 +74,11 @@
   (lambda [$n $axioms]
     (match-all (rename-problem 0 axioms) (set equation)
       {[<cons <equation ,n $l1 $r1>
-        <cons <equation _ <subterm <unify ,l1 $sigma> $context> $r2> _>>
+        <cons <equation _ (& !,l1 <subterm <unify ,l1 $sigma> $context>) $r2> _>>
         (eql (+ n 1) (tsubst sigma r2) (tsubst sigma (context r1)))
         ]
        [<cons <equation !,n $l1 $r1>
-        <cons <equation ,n <subterm <unify ,l1 $sigma> $context> $r2> _>>
+        <cons <equation ,n (& !,l1 <subterm <unify ,l1 $sigma> $context>) $r2> _>>
         (eql (+ n 1) (tsubst sigma r2) (tsubst sigma (context r1)))
         ]}
       )))

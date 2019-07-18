@@ -55,17 +55,6 @@
   (rewrite (p e x) axioms-of-groups)
   (p e x))
 
-(define $unique-unordered-pairs
-  (lambda [$xs]
-    (letrec {[$loop-fn
-              (lambda [$xs $ys]
-                (match [xs ys] [(list equation) (multiset equation)]
-                  {[[<nil> _] ys]
-                   [[<cons <equation _ $l $r> $rs> <cons <equation _ ,l ,r> _>]
-                      (loop-fn rs ys)]
-                   [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
-      (loop-fn xs {}))))
-
 ;;======================= Knuth-Bendix completion ==============================
 
 ; rename free variables of each axioms so that they don't collide
@@ -80,35 +69,37 @@
         (cons (esubst u e)
               (rename-problem (+ n (length u)) es)))]}))
 
-(define $joinable?
-  (match-lambda [something equation]
-    {[[_ <equation _ $s ,s>] #t]
-     [[$axioms <equation _ $s $t>]
-        (eq? (rewrite (debug/fn show-term s) axioms)
-             (rewrite (debug/fn show-term t) axioms))
-      ]}))
-
 (define $critical-pairs'
   (lambda [$n $axioms]
-    (unique-unordered-pairs
-      (match-all (rename-problem 0 axioms) (set equation)
-        {[<cons <equation ,n $l1 $r1>
-          <cons <equation _ <subterm <unify ,l1 $sigma> $context> $r2> _>>
-          (eql (+ n 1) (tsubst sigma r2) (tsubst sigma (context r1)))
-          ]
-         [<cons <equation !,n $l1 $r1>
-          <cons <equation ,n <subterm <unify ,l1 $sigma> $context> $r2> _>>
-          (eql (+ n 1) (tsubst sigma r2) (tsubst sigma (context r1)))
-          ]}
-        ))))
+    (match-all (rename-problem 0 axioms) (set equation)
+      {[<cons <equation ,n $l1 $r1>
+        <cons <equation _ <subterm <unify ,l1 $sigma> $context> $r2> _>>
+        (eql (+ n 1) (tsubst sigma r2) (tsubst sigma (context r1)))
+        ]
+       [<cons <equation !,n $l1 $r1>
+        <cons <equation ,n <subterm <unify ,l1 $sigma> $context> $r2> _>>
+        (eql (+ n 1) (tsubst sigma r2) (tsubst sigma (context r1)))
+        ]}
+      )))
+
+(define $rewrite-pair
+  (lambda [$axioms $eq]
+    (match eq equation
+      {[<dequation $n $l ,l> eq]
+       [<dequation $n $l $r> (eql n (rewrite l axioms) (rewrite r axioms))]})))
+
+(define $is-not-refl
+  (match-lambda equation
+    {[<dequation _ $l ,l> #f]
+     [_ #t]}))
 
 (define $critical-pairs
   (lambda [$n $axioms]
     (let {[$crit (critical-pairs' n axioms)]}
-      (let {[$crit' (map orient-equation
-                         (filter
-                           (lambda [$x] (not (joinable? axioms x)))
-                           crit))]}
+      (let {[$crit'
+             (unique
+               (map orient-equation
+                    (filter is-not-refl (map (rewrite-pair axioms $) crit))))]}
         (io (do
           {[(print (S.concat {(show (length crit)) " critical pairs generated"}))]
            [(print (show-equations crit))]

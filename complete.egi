@@ -23,26 +23,27 @@
   (match-lambda [something equation]
     {[[$u <equation $l $r>] <Equation (tsubst u l) (tsubst u r)>]}))
 
-; term -> {equation} -> term
-(define $normalize
-  (match-lambda [term (multiset equation)]
-    {[[<subterm $subtm $context>
-       (& <cons <equation <unify-ord ,subtm $sigma> $r> _> $axioms)]
-      (normalize (debug/fn show-term (context (tsubst sigma r))) axioms)]
-     [[$t _] t]
-     }))
+; {equation} -> term -> term
+(define $rewrite
+  (lambda [$axioms $tm]
+    (match [tm axioms] [term (multiset equation)]
+      {[[<subterm $subtm $context>
+         <cons <dequation <unify-ord ,subtm $sigma> $r> _>]
+        (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))]
+       [_ tm]
+       })))
 
-(assert-equal "normalize1"
-  (normalize (app "+" two one) axioms-of-nat)
+(assert-equal "rewrite1"
+  (rewrite axioms-of-nat (app "+" two one))
   three)
-(assert-equal "normalize2"
-  (normalize (p (p y y') e) axioms-of-groups)
+(assert-equal "rewrite2"
+  (rewrite axioms-of-groups (p (p y y') e))
   e)
-(assert-equal "normalize3"
-  (normalize (p (p y z) (i (p y z))) axioms-of-groups)
+(assert-equal "rewrite3"
+  (rewrite axioms-of-groups (p (p y z) (i (p y z))))
   e)
-(assert-equal "normalize 4"
-  (normalize (p e x) axioms-of-groups)
+(assert-equal "rewrite 4"
+  (rewrite axioms-of-groups (p e x))
   (p e x))
 
 ;;======================= Knuth-Bendix completion ==============================
@@ -89,11 +90,11 @@
                    [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
       (loop-fn xs {}))))
 
-(define $confluent-pair?
+(define $joinable?
   (match-lambda [something equation]
     {[[$axioms <equation $s $t>]
-        (eq? (normalize (debug/fn show-term s) axioms)
-             (normalize (debug/fn show-term t) axioms))
+        (eq? (rewrite (debug/fn show-term s) axioms)
+             (rewrite (debug/fn show-term t) axioms))
       ]}))
 
 ; pairs (s, t) are kept in the form of <Equation s t>
@@ -125,11 +126,10 @@
 (define $find-new-axioms
   (lambda [$axioms $new-axioms]
     (map orient-equation
-         (filter (lambda [$x] (not (confluent-pair? axioms x)))
+         (filter (lambda [$x] (not (joinable? axioms x)))
                  (critical-pairs axioms new-axioms)))))
 
 ; new-axioms is a subset of axioms
-; TODO: orient critical pairs in right directions so rewriting doesn't explode
 (define $complete-loop
   (lambda [$axioms $new-axioms]
     (match (debug/fn show-equations (find-new-axioms axioms new-axioms)) (multiset something)
@@ -139,22 +139,6 @@
 
 (define $complete
   (complete-loop $1 $1))
-
-(define $crit1 (critical-pairs axioms-of-groups axioms-of-groups))
-; {y * i(y) * x = e * x}
-(define $c1 (find-new-axioms axioms-of-groups axioms-of-groups))
-(define $d1 (union axioms-of-groups c1))
-; {e * i(i(x5)) = x5 * e}
-(define $crit2 (critical-pairs d1 c1))
-(define $c2 (find-new-axioms d1 c1))
-(define $d2 (union d1 c2))
-(define $c3 (find-new-axioms d2 c2))
-
-(show-equations (critical-pairs d2 c2))
-(define $s2
-  <Compound "*" {<Compound "e" {}> <Compound "i" {<Compound "i" {<Var 5>}>}>}>)
-(define $t2
-  <Compound "*" {<Var 5> <Compound "e" {}>}>)
 
 ;;==============================================================================
 
@@ -242,7 +226,3 @@
 
 (define $p7 (eql (app "+" one two) three))
 (define $p8 (eql (app "+" zero two) two))
-
-(assert-equal "normalize"
-  (normalize (app "+" one two) axioms-of-nat)
-  three)

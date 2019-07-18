@@ -33,26 +33,27 @@
   (match-lambda [something equation]
     {[[$u <equation $n $l $r>] <Equation n (tsubst u l) (tsubst u r)>]}))
 
-; term -> {equation} -> term
+; {equation} -> term -> term
 (define $rewrite
-  (match-lambda [term (multiset equation)]
-    {[[<subterm $subtm $context>
-       (& <cons <dequation _ <unify-ord ,subtm $sigma> $r> _> $axioms)]
-      (rewrite (debug/fn show-term (context (tsubst sigma r))) axioms)]
-     [[$t _] t]
-     }))
+  (lambda [$axioms $tm]
+    (match [tm axioms] [term (multiset equation)]
+      {[[<subterm $subtm $context>
+         <cons <dequation _ <unify-ord ,subtm $sigma> $r> _>]
+        (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))]
+       [_ tm]
+       })))
 
 (assert-equal "rewrite1"
-  (rewrite (app "+" two one) axioms-of-nat)
+  (rewrite axioms-of-nat (app "+" two one))
   three)
 (assert-equal "rewrite2"
-  (rewrite (p (p y y') e) axioms-of-groups)
+  (rewrite axioms-of-groups (p (p y y') e))
   e)
 (assert-equal "rewrite3"
-  (rewrite (p (p y z) (i (p y z))) axioms-of-groups)
+  (rewrite axioms-of-groups (p (p y z) (i (p y z))))
   e)
 (assert-equal "rewrite 4"
-  (rewrite (p e x) axioms-of-groups)
+  (rewrite axioms-of-groups (p e x))
   (p e x))
 
 ;;======================= Knuth-Bendix completion ==============================
@@ -86,7 +87,7 @@
   (lambda [$axioms $eq]
     (match eq equation
       {[<dequation $n $l ,l> eq]
-       [<dequation $n $l $r> (eql n (rewrite l axioms) (rewrite r axioms))]})))
+       [<dequation $n $l $r> (eql n (rewrite axioms l) (rewrite axioms r))]})))
 
 (define $is-not-refl
   (match-lambda equation

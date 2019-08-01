@@ -4,9 +4,11 @@
 
 (define $equation
   (matcher
+     ; undirected equation
     {[<equation $ $> [term term]
       {[<Equation $l $r> {[l r] [r l]}]
        [_ {}]}]
+     ; directed equation
      [<dequation $ $> [term term]
       {[<Equation $l $r> {[l r]}]
        [_ {}]}]
@@ -30,8 +32,8 @@
 (define $rewrite
   (lambda [$axioms $tm]
     (match [tm axioms] [term (multiset equation)]
-      {[[<subterm $subtm $context>
-         <cons <dequation <unify-ord ,subtm $sigma> $r> _>]
+      {[[<subterm-nonv $subtm $context>
+         <cons <dequation <unify ,subtm $sigma> $r> _>]
         (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))]
        [_ tm]
        })))

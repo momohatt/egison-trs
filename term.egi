@@ -16,13 +16,11 @@
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
             })]}]
-     [<unify-ord ,$t $> something
-      {[$s (match (unify-ord t s) (maybe something)
-            {[(just $sigma) {sigma}]
-             [(nothing)     {}]
-            })]}]
      [<subterm $ $> [term something]
       {[$s (subterm s)]}]
+     ; subterm at non-variable position
+     [<subterm-nonv $ $> [term something]
+      {[$s (subterm-nonv s)]}]
      [$ something
       {[$tgt {tgt}]}]}))
 
@@ -50,6 +48,18 @@
          [x (compose context context')])]
      [$t [t id]]}))
 
+;; term -> {term, term -> term}
+(define $subterm-nonv
+  (match-all-lambda term
+    {[<compound $f <join $xs <cons <subterm-nonv $x $context> $xs'>>>
+       (let {[$context' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
+         [x (compose context context')])]
+     [(& !<var _> $t) [t id]]}))
+
+(assert-equal "subterm-nonv"
+  (map fst (subterm-nonv (app "+" x (app "S" y))))
+  {(app "S" y) (app "+" x (app "S" y))})
+
 (define $occur
   (pattern-function [$v]
     (| <var v>
@@ -63,6 +73,8 @@
   (match-lambda (unordered-pair term)
     {[<pair <var $x> <var ,x>>
       (Just {})] ; 成功(空の代入を返す)
+     [<pair <var $x> <var (& !,x $y)>>
+      (Just {[x <Var y>] [y <Var x>]})]
      [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
       (Just {[x t]})] ; 代入[t/x]を返す
      [<pair <compound $f <nil>> <compound ,f <nil>>>
@@ -76,32 +88,6 @@
           {[(nothing) Nothing] ; 失敗
            [(just $u2) (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
      [_ Nothing]}))
-
-; ordered unification
-; ex. (unify-ord c (var x)) ... OK
-;     (unify-ord (var c) (var x)) ... OK
-;     (unify-ord (var x) c) ... NG
-(define $unify-ord
-  (match-lambda [term term]
-    {[[<var $x> <var ,x>]
-      (Just {})] ; 成功(空の代入を返す)
-     [[(& $t (later !(occur ,x))) <var $x>] ; 自由出現しない場合
-      (Just {[x t]})] ; 代入[t/x]を返す
-     [[<compound $f <nil>> <compound ,f <nil>>]
-      (Just {})] ; 成功
-     [[<compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>]
-      (match (unify-ord x y) (maybe something)
-       {[(nothing) Nothing] ; unifyがすでに失敗している
-        [(just $u1) ; unifiableな場合、単一化子をsingletonから取り出す
-         (match (unify-ord <Compound f xs> (tsubst u1 <Compound f ys>))
-                (maybe something)
-          {[(nothing) Nothing] ; 失敗
-           [(just $u2) (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
-     [_ Nothing]}))
-
-(assert-equal "unify-ord1" (unify-ord (app "+" a b) x)  (Just {[0 (app "+" a b)]}))
-(assert-equal "unify-ord2" (unify-ord x (app "+" y z))  Nothing)
-(assert-equal "unify-ord3" (unify-ord (p y z) (p x x')) Nothing)
 
 ; ================================== LPO =======================================
 

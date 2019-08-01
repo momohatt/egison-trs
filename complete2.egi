@@ -37,8 +37,8 @@
 (define $rewrite
   (lambda [$axioms $tm]
     (match [tm axioms] [term (multiset equation)]
-      {[[<subterm $subtm $context>
-         <cons <dequation _ <unify-ord ,subtm $sigma> $r> _>]
+      {[[<subterm-nonv $subtm $context>
+         <cons <dequation _ <unify ,subtm $sigma> $r> _>]
         (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))]
        [_ tm]
        })))
@@ -55,6 +55,13 @@
 (assert-equal "rewrite 4"
   (rewrite axioms-of-groups (p e x))
   (p e x))
+(assert-equal "rewrite 5"
+  (rewrite axioms-of-nat (app "+" (app "S" z) (app "S" w)))
+  (app "+" z (app "S" (app "S" w))))
+; FIXME: rewrite 6 doesn't pass
+(assert-equal "rewrite 5"
+  (rewrite axioms-of-nat (app "+" (app "S" x) (app "S" y)))
+  (app "+" z (app "S" (app "S" w))))
 
 ;;======================= Knuth-Bendix completion ==============================
 
@@ -96,23 +103,24 @@
 
 (define $critical-pairs
   (lambda [$n $axioms]
-    (let {[$crit (critical-pairs' n axioms)]}
-      (let {[$crit'
+    (let* {[$crit (critical-pairs' n axioms)]
+           [$crit'
              (unique
                (map orient-equation
                     (filter is-not-refl (map (rewrite-pair axioms $) crit))))]}
-        (io (do
-          {[(print (S.concat {(show (length crit)) " critical pairs generated"}))]
-           [(print (show-equations crit))]
-           [(print (S.concat {(show (length crit')) " remained"}))]
-           [(print (show-equations crit'))]}
-           (return crit')))))))
+      (io (do
+        {[(print (S.concat {(show (length crit)) " critical pairs generated"}))]
+         [(print (show-equations crit))]
+         [(print (S.concat {(show (length crit')) " remained"}))]
+         [(print (show-equations crit'))]}
+         (return crit'))))))
 
 (define $orient-equation
   (lambda [$e]
     (match e equation
       {[<equation $n $l $r>
-                  (if (succ? l r) e (eql n r l))]})))
+                  (if (succ? l r) e
+                      (if (succ? r l) (eql n r l) undefined))]})))
 
 (define $complete-loop
   (lambda [$n $axioms]

@@ -4,10 +4,6 @@
       {[<pair $ $> [m m] {[[$x $y] {[x y] [y x]}]}]
       [$ [something] {[$tgt {tgt}]}]})))
 
-(assert-equal "unique-unordered-pair"
-  (unique-unordered-pair {[1 2] [2 1]})
-  {[1 2]})
-
 (define $compare-c/fn
   (lambda [$ord $c1 $c2]
     (match [c1 c2] [(list something) (list something)]

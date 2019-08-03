@@ -16,6 +16,11 @@
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
             })]}]
+     [<unify' ,$t $> something
+      {[$s (match (unify' s t) (maybe something)
+            {[(just $sigma) {sigma}]
+             [(nothing)     {}]
+            })]}]
      [<subterm $ $> [term something]
       {[$s (subterm s)]}]
      ; subterm at non-variable position
@@ -73,8 +78,8 @@
   (match-lambda (unordered-pair term)
     {[<pair <var $x> <var ,x>>
       (Just {})] ; 成功(空の代入を返す)
-     [<pair <var $x> <var (& !,x $y)>>
-      (Just {[x <Var y>] [y <Var x>]})]
+     [<pair <var $x> <var $y>>
+      (Just {[x <Var y>]})]
      [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
       (Just {[x t]})] ; 代入[t/x]を返す
      [<pair <compound $f <nil>> <compound ,f <nil>>>
@@ -88,6 +93,45 @@
           {[(nothing) Nothing] ; 失敗
            [(just $u2) (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
      [_ Nothing]}))
+
+; free variables of two terms are treated as if they are disjoint
+(define $unify'
+  (match-lambda [term term]
+    {[[<var $x> <var ,x>]
+      (Just {})] ; 成功(空の代入を返す)
+     [[<var $x> $y]
+      (Just {[x y]})]
+     [[<compound $f <nil>> <compound ,f <nil>>]
+      (Just {})] ; 成功
+     [[<compound $f $xs>
+       ; <compound ,f (& ?(lambda [$ys] (eq? (length xs) (length ys))) $ys)>]
+       <compound ,f $ys>]
+      (match (map2 (unify' $1 $2) xs ys) (multiset (maybe (multiset [integer term])))
+        {[<cons (nothing) _> Nothing]
+         [<cons (just <cons [$x $t] _>) <cons (just <cons [,x !,t] _>) _>>
+          Nothing]
+         [$s {(unique (concat (concat s)))}]}
+        )]
+     [_ Nothing]}))
+
+(assert-equal "unify-1"
+  (unify' (app "+" (app "S" x) y) (app "+" two one))
+  (Just {[0 one] [1 one]}))
+(assert-equal "unify-2"
+  (unify' (p x e) (p (p y y') e))
+  (Just {[0 (p y y')]}))
+(assert-equal "unify-3"
+  (unify' (p x x') (p y y'))
+  (Just {[0 y]}))
+(assert-equal "unify-4"
+  (unify (app "+" (app "S" x) y) (app "+" (app "S" w) (app "S" z)))
+  (Just {[0 w] [1 (app "S" z)]}))
+(assert-equal "unify-5"
+  (unify' (p (p x y) z) (p (p y z) (i (p y z))))
+  (Just {[0 y] [1 z] [2 (i (p y z))]}))
+(assert-equal "unify-6"
+  (unify' (p x x') (p z (i (p y z))))
+  Nothing)
 
 ; ================================== LPO =======================================
 
@@ -163,6 +207,13 @@
 (define $y (var 1))
 (define $z (var 2))
 (define $w (var 3))
+
+(define $x4 (var 4))
+(define $x5 (var 5))
+(define $x6 (var 6))
+(define $x7 (var 7))
+(define $x8 (var 8))
+(define $x9 (var 9))
 
 (define $bottom (var -1))
 

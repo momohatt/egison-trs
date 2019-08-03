@@ -29,27 +29,32 @@
     {[[$u <equation $l $r>] <Equation (tsubst u l) (tsubst u r)>]}))
 
 ; {equation} -> term -> term
+; free variables of axioms and tm should be disjoint!!!
 (define $rewrite
   (lambda [$axioms $tm]
     (match [tm axioms] [term (multiset equation)]
       {[[<subterm-nonv $subtm $context>
-         <cons <dequation <unify ,subtm $sigma> $r> _>]
-        (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))]
+         <cons <dequation <unify' ,subtm $sigma> $r> _>]
+        (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))
+        ]
        [_ tm]
        })))
 
-(assert-equal "rewrite1"
+(assert-equal "rewrite 1"
   (rewrite axioms-of-nat (app "+" two one))
   three)
-(assert-equal "rewrite2"
-  (rewrite axioms-of-groups (p (p y y') e))
+(assert-equal "rewrite 2"
+  (rewrite axioms-of-groups (p (p x4 (i x4)) e))
   e)
-(assert-equal "rewrite3"
-  (rewrite axioms-of-groups (p (p y z) (i (p y z))))
+(assert-equal "rewrite 3"
+  (rewrite axioms-of-groups (p (p x4 x5) (i (p x4 x5))))
   e)
 (assert-equal "rewrite 4"
   (rewrite axioms-of-groups (p e x))
   (p e x))
+(assert-equal "rewrite 5"
+  (rewrite axioms-of-nat (app "+" (app "S" x4) (app "S" x5)))
+  (app "+" x4 (app "S" (app "S" x5))))
 
 ;;======================= Knuth-Bendix completion ==============================
 
@@ -82,6 +87,7 @@
                    [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
       (loop-fn xs {}))))
 
+;; {equation} -> {[term term]}
 (define $critical-pairs
   (lambda [$axioms]
     (match-all (rename-problem 0 axioms) (set equation)
@@ -91,6 +97,7 @@
         ]
        })))
 
+;; {equation} -> equation -> {[term term]}
 (define $critical-pairs'
   (lambda [$axioms $new-axiom]
     (match-all (rename-problem' axioms new-axiom) [(multiset equation) equation]
@@ -160,9 +167,9 @@
 (define $w' (i w))
 
 (define $axioms-of-groups
-  {(eql (p (p x y) z) (p x (p y z)))
-   (eql (p x x') e)            ; x * x' = e
+  {(eql (p x x') e)            ; x * x' = e
    (eql (p x e) x)             ; x * e = x
+   (eql (p (p x y) z) (p x (p y z)))
   })
 
 (define $axioms-of-groups-complete

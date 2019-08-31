@@ -1,132 +1,91 @@
 ; Implementation of term rewriting system in Egison
 
-(load-file "term.egi")
+(load-file "equation.egi")
+(load-file "example.egi")
 
-(define $equation
-  (matcher
-    {[<equation $ $> [term term]
-      {[<Equation $l $r> {[l r] [r l]}] ; like the unordered-pair
-       [_ {}]}]
-     [$ something
-      {[$tgt {tgt}]}]
-     }))
-
-(define $eql (lambda [$x $y] <Equation x y>))
-
-; {term} -> {equation} -> {term}
+; {equation} -> term -> term
+; 1つだけ選ぶ
+; free variables of axioms and tm should be disjoint!!!
 (define $rewrite
-  (lambda [$tgt $axiom]
-    (unique
-      (match-all [tgt axiom] [(multiset term) (multiset equation)]
-        {[[<cons <subterm $subtm $context> _>
-                 <cons <equation <unify ,subtm $sigma> $r> _>]
-          (context (tsubst sigma r))
-          ]
-        }))))
+  (lambda [$axioms $tm]
+    (match [tm axioms] [term (multiset equation)]
+      {[[<subterm-nonv $subtm $context>
+         <cons <dequation <unify' ,subtm $sigma> $r> _>]
+        (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))
+        ]
+       [_ tm]
+       })))
+
+(assert-equal "rewrite 1"
+  (rewrite axioms-of-nat (app "+" two one))
+  three)
+(assert-equal "rewrite 2"
+  (rewrite axioms-of-groups (p (p x4 (i x4)) e))
+  e)
+(assert-equal "rewrite 3"
+  (rewrite axioms-of-groups (p (p x4 x5) (i (p x4 x5))))
+  e)
+(assert-equal "rewrite 4"
+  (rewrite axioms-of-groups (p e x))
+  (p e x))
+(assert-equal "rewrite 5"
+  (rewrite axioms-of-nat (app "+" (app "S" x4) (app "S" x5)))
+  (app "+" x4 (app "S" (app "S" x5))))
+
+; {equation} -> {term} -> {term}
+(define $rewrite-all
+  (lambda [$axioms $tms]
+    (match-all [tms axioms] [(multiset term) (multiset equation)]
+      {[[<cons <subterm-nonv $subtm $context> _>
+         <cons <dequation <unify ,subtm $sigma> $r> _>]
+        (context (tsubst sigma r))]
+      })))
 
 (define $rewrite-loop
-  (match-lambda [term (multiset term) (multiset term)]
+  (match-lambda [term (multiset term) (multiset equations)]
     {[[$goal <cons ,goal _> _]
       <PROVEN>]
      [[_ <nil> _]
       <REFUTED>]
-     [[$goal $tgt $axiom]
-      (rewrite-loop goal (debug/fn show-terms (rewrite tgt axiom)) axiom)]
+     [[$goal $tgt $axioms]
+      (rewrite-loop goal (debug/fn show-terms (rewrite-all axioms tgt)) axioms)]
      }))
 
 (define $solve
-  (match-lambda [equation (multiset equation)]
-    {[[<equation $l $r> $axiom] (rewrite-loop r {l} axiom)]
+  (match-lambda [(multiset equation) equation]
+    {[[$axioms <dequation $l $r>] (rewrite-loop r {l} axioms)]
      }))
 
 ;;==============================================================================
 
-(define $show-equation
-  (match-lambda equation
-    {[<equation $x $y> (S.concat {(show-term x) " = " (show-term y)})]}))
-
-(define $show-equations
-  (col-show/fn show-equation $1))
-
-;;==============================================================================
-
-(define $p (app "*" $1 $2)) ; product
-(define $i (app "i" $1))    ; inverse
-(define $e (app "e"))       ; 単位元
-
-(define $a' (i a))
-(define $b' (i b))
-(define $c' (i c))
-(define $d' (i d))
-
-(define $x' (i x))
-(define $y' (i y))
-(define $z' (i z))
-(define $w' (i w))
-
-(define $axioms-of-groups
-  {(eql (p (p x y) z) (p x (p y z)))
-   (eql (p x x') e)            ; x * x' = e
-   (eql (p x e) x)             ; x * e = x
-  })
-
-(define $axioms-of-groups-complete
-  {@axioms-of-groups
-   (eql (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
-   (eql (p y' (p y x)) x)      ; y' * (y * x) = x
-   (eql (p x' x) e)            ; x' * x = e
-   (eql (i e) e)               ; e' = e
-   (eql (i x') x)              ; x'' = x
-   (eql (p e x) x)             ; e * x = x
-   (eql (p x (p x' y)) y)      ; x * (x' * y) = y
-  })
-
-; (a * a')' = e
-(define $g1' (i (p a a')))
-; <PROVEN> with
-;  (solve g1 axioms-of-groups-complete)
-(define $g1 (eql g1' e))
-
-; (((b * c) * d)' * b)' * d' = c
-(define $g2' (p (i (p (i (p (p b c) d)) b))
-                (i d)))
-; <PROVEN> with
-;  (solve g2 axioms-of-groups-complete)
-(define $g2 (eql g2' c))
-; (((b * c) * d)' * b)' * d'
-; = (d' * (b * c)' * b)' * d'
-; = (d' * c' * b' * b)' * d'
-; = (d' * c' * e)' * d'
-; = (d' * c')' * d'
-; = c'' * d'' * d'
-; = c'' * d * d'
-; = c'' * e
-; = c * e
-; = c
-
-; difficult...
-(define $g3 (eql (p g1' g2') c))
-
-; e * a = a
-(define $g4 (eql (p e a) a))
-
-; a' * a = e
-(define $g5 (eql (p a' a) e))
-
-;;==============================================================================
-
-(define $zero  (app "O"))
-(define $one   (app "S" (app "O")))
-(define $two   (app "S" (app "S" (app "O"))))
-(define $three (app "S" (app "S" (app "S" (app "O")))))
-(define $four  (app "S" (app "S" (app "S" (app "S" (app "O"))))))
-
-(define $axioms-of-nat
-   ; O + x = x
-  {(eql (app "+" zero x) x)
-   ; S(m) + n = m + S(n)
-   (eql (app "+" (app "S" x) y) (app "+" x (app "S" y)))
-   })
-
-(define $p7 (eql (app "+" one two) three))
-(define $p8 (eql (app "+" zero two) two))
+;; (a * a')' = e
+;(define $g1' (i (p a a')))
+;; <PROVEN> with
+;;  (solve g1 axioms-of-groups-complete)
+;(define $g1 (eql g1' e))
+;
+;; (((b * c) * d)' * b)' * d' = c
+;(define $g2' (p (i (p (i (p (p b c) d)) b))
+;                (i d)))
+;; <PROVEN> with
+;;  (solve g2 axioms-of-groups-complete)
+;(define $g2 (eql g2' c))
+;; (((b * c) * d)' * b)' * d'
+;; = (d' * (b * c)' * b)' * d'
+;; = (d' * c' * b' * b)' * d'
+;; = (d' * c' * e)' * d'
+;; = (d' * c')' * d'
+;; = c'' * d'' * d'
+;; = c'' * d * d'
+;; = c'' * e
+;; = c * e
+;; = c
+;
+;; difficult...
+;(define $g3 (eql (p g1' g2') c))
+;
+;; e * a = a
+;(define $g4 (eql (p e a) a))
+;
+;; a' * a = e
+;(define $g5 (eql (p a' a) e))

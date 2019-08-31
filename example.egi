@@ -1,0 +1,104 @@
+(define $p (app "*" $1 $2)) ; product
+(define $i (app "i" $1))    ; inverse
+(define $e (app "e"))       ; 単位元
+
+(define $a' (i a))
+(define $b' (i b))
+(define $c' (i c))
+(define $d' (i d))
+
+(define $x' (i x))
+(define $y' (i y))
+(define $z' (i z))
+(define $w' (i w))
+
+(define $axioms-of-groups
+  {(eql (p x x') e)            ; x * x' = e
+   (eql (p x e) x)             ; x * e = x
+   (eql (p (p x y) z) (p x (p y z)))
+  })
+
+(define $axioms-of-groups-complete
+  {@axioms-of-groups
+   (eql (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
+   (eql (p y' (p y x)) x)      ; y' * (y * x) = x
+   (eql (p x' x) e)            ; x' * x = e
+   (eql (i e) e)               ; e' = e
+   (eql (i x') x)              ; x'' = x
+   (eql (p e x) x)             ; e * x = x
+   (eql (p x (p x' y)) y)      ; x * (x' * y) = y
+  })
+
+; (a * a')' = e
+(define $g1' (i (p a a')))
+(define $g1 (eql g1' e))
+
+; (((b * c) * d)' * b)' * d' = c
+(define $g2' (p (i (p (i (p (p b c) d)) b))
+                (i d)))
+(define $g2 (eql g2' c))
+; (((b * c) * d)' * b)' * d'
+; = (d' * (b * c)' * b)' * d'
+; = (d' * c' * b' * b)' * d'
+; = (d' * c' * e)' * d'
+; = (d' * c')' * d'
+; = c'' * d'' * d'
+; = c'' * d * d'
+; = c'' * e
+; = c * e
+; = c
+
+(define $g3 (eql (p g1' g2') c))
+
+; e * a = a
+(define $g4 (eql (p e a) a))
+
+; a' * a = e
+(define $g5 (eql (p a' a) e))
+
+;;==============================================================================
+
+(define $zero  (app "O"))
+(define $one   (app "S" (app "O")))
+(define $two   (app "S" (app "S" (app "O"))))
+(define $three (app "S" (app "S" (app "S" (app "O")))))
+(define $four  (app "S" (app "S" (app "S" (app "S" (app "O"))))))
+
+(define $axioms-of-nat
+   ; O + x = x
+  {(eql (app "+" zero x) x)
+   ; S(m) + n = m + S(n)
+   (eql (app "+" (app "S" x) y) (app "+" x (app "S" y)))
+   })
+
+(define $p7 (eql (app "+" one two) three))
+(define $p8 (eql (app "+" zero two) two))
+
+;;==============================================================================
+
+; small example from
+; https://github.com/mir-ikbch/compl_coq/blob/8.5/test-suite/test.v
+
+(define $op (app "*" $1 $2))
+
+; (x * y) * (y * z) = y
+(define $axioms-ikebuchi
+  {(eql (op (op x y) (op y z)) y)})
+
+; ex.
+; ((a * b) * (b * c)) * ((b * c) * c) = b * c
+
+; completion result in PLAR program:
+; [<<(x3 * x0 * x1) * x1 = x0 * x1>>; <<x1 * (x1 * x2) * x5 = x1 * x2>>;
+;  <<(x * y) * y * z = y>>]
+
+;;==============================================================================
+
+; small example from PLAR
+
+; f(f(x)) = g(x)
+(define $axioms-plar
+  {(eql (app "f" (app "f" x)) (app "g" x))})
+
+; completion result:
+; f(g(x)) = g(f(x)), g(x) = g(x)

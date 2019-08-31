@@ -1,0 +1,36 @@
+(load-file "term.egi")
+
+(define $equation
+  (matcher
+     ; undirected equation
+    {[<equation $ $> [term term]
+      {[<Equation $l $r> {[l r] [r l]}]
+       [_ {}]}]
+     ; directed equation
+     [<dequation $ $> [term term]
+      {[<Equation $l $r> {[l r]}]
+       [_ {}]}]
+     [$ something
+      {[$tgt {tgt}]}]
+     }))
+
+(define $eql (lambda [$x $y] <Equation x y>))
+
+(define $efv
+  (lambda [$eq]
+    (unique
+      (match eq equation
+        {[<equation $l $r> (append (fv l) (fv r))]}))))
+
+(define $esubst
+  (match-lambda [something equation]
+    {[[$u <equation $l $r>] <Equation (tsubst u l) (tsubst u r)>]}))
+
+;;==============================================================================
+
+(define $show-equation
+  (match-lambda equation
+    {[<equation $x $y> (S.concat {(show-term x) " = " (show-term y)})]}))
+
+(define $show-equations
+  (col-show/fn show-equation $1))

@@ -1,6 +1,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 
 import Data.List
+import Data.Maybe
 
 data Term
   = Var String
@@ -13,7 +14,7 @@ instance Show Term where
   show (Compound "*" [x, y]) = "(" ++ show x ++ " * " ++ show y ++ ")"
   show (Compound f xs) = f ++ "(" ++ intercalate ", " (map show xs) ++ ")"
 
-data Equation = Eq Term Term
+data Equation = Eq (Term, Term)
   deriving Eq
 type Substitution = [(String, Term)]
 
@@ -36,11 +37,11 @@ instance Entity Term where
   occur x (Compound f xs) = any (occur x) xs
 
 instance Entity Equation where
-  fv (Eq lhs rhs) = nub $ fv lhs ++ fv rhs
+  fv (Eq(lhs, rhs)) = nub $ fv lhs ++ fv rhs
 
-  subst sigma (Eq lhs rhs) = Eq (subst sigma lhs) (subst sigma rhs)
+  subst sigma (Eq(lhs, rhs)) = Eq (subst sigma lhs, subst sigma rhs)
 
-  occur x (Eq lhs rhs) = occur x lhs || occur x rhs
+  occur x (Eq(lhs, rhs)) = occur x lhs || occur x rhs
 
 
 renamePair :: Entity a => (a, a) -> (a, a)
@@ -90,7 +91,7 @@ mapSubterms prev (x:xs) =
   ++ mapSubterms (prev ++ [x]) xs
 
 crit1 :: Equation -> Equation -> [(Term, Term)]
-crit1 (Eq l1 r1) (Eq l2 r2) =
+crit1 (Eq(l1, r1)) (Eq(l2, r2)) =
   let subtms = subterms l1
    in foldl helper [] subtms
   where
@@ -130,7 +131,7 @@ overlaps (l, r) tm@(Compound f xs) rfn =
    in listcases (overlaps (l, r)) (\sigma a -> rfn sigma (Compound f a)) xs acc
 
 crit2 :: Equation -> Equation -> [(Term, Term)]
-crit2 (Eq l1 r1) (Eq l2 r2) =
+crit2 (Eq(l1, r1)) (Eq(l2, r2)) =
   overlaps (l1, r1) l2  $ \sigma t -> (subst sigma t, subst sigma r2)
 
 criticalPairs' :: Equation -> Equation -> [(Term, Term)]
@@ -158,51 +159,81 @@ three = Compound "S" [two]
 
 axiomIkebuchi :: [Equation]
 axiomIkebuchi =
-  [Eq (Compound "*" [(Compound "*" [x, y]), (Compound "*" [y, z])]) y]
+  [Eq ((Compound "*" [(Compound "*" [x, y]), (Compound "*" [y, z])]), y)]
 
 -- unify (Compound "+" [(Compound "S" [x]), y]) (Compound "+" [one, two])
 
+normalizeAndOrient :: (Term -> Term -> Bool) -> [Equation] -> (Term, Term)
+                   -> Maybe Equation
+normalizeAndOrient ord eqs (s, t) =
+  let s' = rewrite eqs s
+      t' = rewrite eqs t
+      ret
+        | ord s' t' = Just $ Eq (s', t')
+        | ord t' s' = Just $ Eq (t', s')
+        | otherwise = Nothing
+      in ret
+
+rewrite :: [Equation] -> Term -> Term
+rewrite axioms tm =
+  case rewrite' axioms tm of
+    Just tm' -> tm'
+    Nothing -> tm
+  where
+    rewrite' [] tm = Nothing
+    rewrite' ((Eq(s, t)):axioms) tm =
+      case rewrite'' (s, t) (subterms tm) of
+        Nothing -> rewrite' axioms tm
+        Just tm -> Just tm
+    rewrite'' (s, t) [] = Nothing
+    rewrite'' (s, t) ((subtm, ctx):xs) =
+      case unify s subtm of
+        Just sigma -> Just $ ctx (subst sigma t)
+        Nothing -> rewrite'' (s, t) xs
+
+
+reportStatus :: ([Equation], [(Term, Term)], [(Term, Term)]) -> IO ()
+reportStatus (eqs, deferred, crits) = do
+  putStrLn $ show (length eqs) ++ " equations and " ++
+    show (length crits) ++ " pending critical pairs " ++
+      show (length deferred) ++ " deferred"
+
+
+complete' :: (Term -> Term -> Bool)
+         -> ([Equation], [(Term, Term)], [(Term, Term)])
+         -> Maybe [Equation]
+complete' ord (eqs, [], []) =
+  return eqs
+complete' ord (eqs, deferred, []) = do
+  e <- find (isJust . (normalizeAndOrient ord eqs)) deferred
+  complete' ord (eqs, filter (/= e) deferred, [e])
+complete' ord (eqs, deferred, eq:oldcrits) =
+  let triplets =
+        (case normalizeAndOrient ord eqs eq of
+           Nothing -> (eqs, eq:deferred, oldcrits)
+           Just (Eq (s', t'))
+             | s' == t'  -> (eqs, deferred, oldcrits)
+             | otherwise ->
+               let eq' = Eq(s', t')
+                   eqs' = eq' : eqs
+                   newcrits = foldl (\acc eq -> acc ++ criticalPairs eq' eq) [] eqs'
+                in (eqs', deferred, oldcrits ++ newcrits))
+   in complete' ord triplets
+
+
+complete :: [Term] -> [Equation] -> Maybe [Equation]
+complete ordList eqs =
+  complete' ord (eqs, [], concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs])
+    where
+      -- TODO: ord is wrong
+      ord :: Term -> Term -> Bool
+      ord x y =
+        let (Just xi) = elemIndex x ordList
+            (Just yi) = elemIndex y ordList
+         in xi <= yi
+
+
 {-
-(* ------------------------------------------------------------------------- *)
-(* Orienting an equation.                                                    *)
-(* ------------------------------------------------------------------------- *)
-
-let normalize_and_orient ord eqs (Atom(R("=",[s;t]))) =
-  let s' = rewrite eqs s and t' = rewrite eqs t in
-  if ord s' t' then (s',t') else if ord t' s' then (t',s')
-  else failwith "Can't orient equation";;
-
-(* ------------------------------------------------------------------------- *)
-(* Status report so the user doesn't get too bored.                          *)
-(* ------------------------------------------------------------------------- *)
-
-let status(eqs,def,crs) eqs0 =
-  (* if eqs = eqs0 & (length crs) mod 1000 <> 0 then () else *)
-  (print_string(string_of_int(length eqs)^" equations and "^
-                string_of_int(length crs)^" pending critical pairs + "^
-                string_of_int(length def)^" deferred");
-   print_newline());;
-
-(* ------------------------------------------------------------------------- *)
-(* Completion main loop (deferring non-orientable equations).                *)
-(* ------------------------------------------------------------------------- *)
-
-let rec complete ord (eqs,def,crits) =
-  match crits with
-  | eq::ocrits ->
-        let trip =
-          try let (s',t') = normalize_and_orient ord eqs eq in
-              if s' = t' then (eqs,def,ocrits) else
-              let eq' = Atom(R("=",[s';t'])) in
-              let eqs' = eq'::eqs in
-              eqs',def,
-              ocrits @ itlist ((@) ** critical_pairs eq') eqs' []
-          with Failure _ -> (eqs,eq::def,ocrits) in
-        status trip eqs; complete ord trip
-  | _ -> if def = [] then eqs else
-         let e = find (can (normalize_and_orient ord eqs)) def in
-         complete ord (eqs,subtract def [e],[e]);;
-
 (* ------------------------------------------------------------------------- *)
 (* Interreduction.                                                           *)
 (* ------------------------------------------------------------------------- *)

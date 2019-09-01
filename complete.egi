@@ -20,18 +20,6 @@
     (let {[$r (rename-problem 0 {eq @axioms})]}
       [(cdr r) (car r)])))
 
-(define $unique-unordered-pairs
-  (lambda [$xs]
-    (letrec {[$loop-fn
-              (lambda [$xs $ys]
-                (match [xs ys] [(list equation) (multiset equation)]
-                  {[[<nil> _] ys]
-                   [[<cons $x $rs> <cons ,x _>] (loop-fn rs ys)]
-                   [[<cons <equation $l $r> $rs> <cons <equation ,r ,l> _>]
-                      (loop-fn rs ys)]
-                   [[<cons $x $rs>  _] (loop-fn rs {@ys x})]}))]}
-      (loop-fn xs {}))))
-
 ;; {equation} -> {[term term]}
 (define $critical-pairs
   (lambda [$axioms]
@@ -84,3 +72,12 @@
   (lambda [$axioms]
     (complete-loop axioms
                    (critical-pairs axioms))))
+
+;;==============================================================================
+
+(define $show-critical-pair
+  (match-lambda [term term]
+    {[[$l $r] (S.concat {"[" (show-term l) ", " (show-term r) "]"})]}))
+
+(define $show-critical-pairs
+  (col-show/fn show-critical-pair $1))

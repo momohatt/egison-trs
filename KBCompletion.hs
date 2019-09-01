@@ -76,34 +76,39 @@ unify (Compound f (x:xs)) (Compound g (y:ys))
 unify _ _ = Nothing
 
 
-listcases :: _
-listcases fn rfn lis acc =
-  case lis of
-    [] -> acc
-    h:t ->
-      fn h (\i h' -> rfn i (h':t)) ++ listcases fn (\i t' -> rfn i (h:t')) t acc
+listcases :: (Term -> (Substitution -> Term -> (Term, Term)) -> [(Term, Term)])
+          -> (Substitution -> [Term] -> (Term, Term))
+          -> [Term]
+          -> [(Term, Term)]
+          -> [(Term, Term)]
+listcases fn rfn [] acc = acc
+listcases fn rfn (x:xs) acc =
+  fn x (\sigma x' -> rfn sigma (x':xs)) ++
+    listcases fn (\sigma xs' -> rfn sigma (x:xs')) xs acc
 
 
-overlaps :: _
-overlaps (l, r) tm rfn =
-  case tm of
-    Var x -> []
-    Compound f args ->
-      let acc = (case unify l tm of
-                   Just sth -> [rfn sth r]
-                   Nothing -> [])
-       in listcases (overlaps (l, r)) (\i a -> rfn i (Compound f a)) args acc
+overlaps :: (Term, Term) -> Term
+         -> (Substitution -> Term -> (Term, Term))
+         -> [(Term, Term)]
+overlaps (l, r) (Var _) rfn = []
+overlaps (l, r) tm@(Compound f xs) rfn =
+  let acc = (case unify l tm of
+               Just sth -> [rfn sth r]
+               Nothing -> [])
+   in listcases (overlaps (l, r)) (\sigma a -> rfn sigma (Compound f a)) xs acc
 
 
 crit1 :: Equation -> Equation -> [(Term, Term)]
 crit1 (Eq l1 r1) (Eq l2 r2) =
-  overlaps (l1, r1) l2  $ \i t -> (subst i t, subst i r2)
+  overlaps (l1, r1) l2  $ \sigma t -> (subst sigma t, subst sigma r2)
+
 
 criticalPairs :: Equation -> Equation -> [(Term, Term)]
 criticalPairs tm1 tm2 =
   let (tm1', tm2') = renamePair (tm1, tm2)
    in if tm1 == tm2 then crit1 tm1' tm2'
                     else nub $ crit1 tm1' tm2' ++ crit1 tm2' tm1'
+
 
 --
 -- Examples

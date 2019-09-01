@@ -1,6 +1,4 @@
-; Implementation of _complete_ term rewriting system in Egison
-
-(load-file "equation.egi")
+(load-file "rewrite.egi")
 (load-file "example.egi")
 
 ;;======================= Knuth-Bendix completion ==============================
@@ -68,23 +66,21 @@
           (S.concat {(show (length axioms)) " axioms, "
                      (show (length crits)) " pending critical pairs"}))]}
       (return
-        (let {[$. (report axioms crits)]}
-          (match crits (list [term term])
-            {[<nil> axioms]
-             [<cons [$l $r] $crits'>
-              (let {[$l' (rewrite axioms (debug/fn show-term l))]
-                    [$r' (rewrite axioms (debug/fn show-term r))]}
-                (if (eq? l' r')
-                    (complete-loop axioms crits')
-                    (let {[$new-axiom
-                           (debug/fn show-equation (orient-equation l' r'))]}
-                      (complete-loop
-                        {@axioms new-axiom}
-                        (union crits (critical-pairs' axioms new-axiom))))))
-              ]})))))))
+        (match crits (list [term term])
+          {[<nil> axioms]
+           [<cons [$l $r] $crits'>
+            (let {[$l' (rewrite axioms (debug/fn show-term l))]
+                  [$r' (rewrite axioms (debug/fn show-term r))]}
+              (if (eq? l' r')
+                  (complete-loop axioms crits')
+                  (let {[$new-axiom
+                         (debug/fn show-equation (orient-equation l' r'))]}
+                    (complete-loop
+                      {@axioms new-axiom}
+                      (union crits (critical-pairs' axioms new-axiom))))))
+            ]}))))))
 
 (define $complete
   (lambda [$axioms]
     (complete-loop axioms
                    (critical-pairs axioms))))
-

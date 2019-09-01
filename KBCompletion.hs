@@ -76,6 +76,39 @@ unify (Compound f (x:xs)) (Compound g (y:ys))
 unify _ _ = Nothing
 
 
+-- Non-variable subterms
+subterms :: Term -> [(Term, Term -> Term)]
+subterms (Var _) = []
+subterms t@(Compound f xs) =
+  (t, id) :
+  (map (\(t, context) -> (t, \x -> Compound f $ context x)) $ mapSubterms [] xs)
+
+mapSubterms :: [Term] -> [Term] -> [(Term, Term -> [Term])]
+mapSubterms _ [] = []
+mapSubterms prev (x:xs) =
+  map (\(t, context) -> (t, \x -> prev ++ context x : xs)) (subterms x)
+  ++ mapSubterms (prev ++ [x]) xs
+
+crit1 :: Equation -> Equation -> [(Term, Term)]
+crit1 (Eq l1 r1) (Eq l2 r2) =
+  let subtms = subterms l1
+   in foldl helper [] subtms
+  where
+    helper :: [(Term, Term)] -> (Term, Term -> Term) -> [(Term, Term)]
+    helper acc (subtm, context) =
+      case unify l2 subtm of
+        Nothing -> acc
+        Just sigma ->
+          (subst sigma r1, subst sigma $ context r2) : acc
+
+criticalPairs :: Equation -> Equation -> [(Term, Term)]
+criticalPairs tm1 tm2 =
+  let (tm1', tm2') = renamePair (tm1, tm2)
+   in if tm1 == tm2 then crit1 tm1' tm2'
+                    else nub $ crit1 tm1' tm2' ++ crit1 tm2' tm1'
+
+
+-- Implementation in the textbook
 listcases :: (Term -> (Substitution -> Term -> (Term, Term)) -> [(Term, Term)])
           -> (Substitution -> [Term] -> (Term, Term))
           -> [Term]
@@ -85,7 +118,6 @@ listcases fn rfn [] acc = acc
 listcases fn rfn (x:xs) acc =
   fn x (\sigma x' -> rfn sigma (x':xs)) ++
     listcases fn (\sigma xs' -> rfn sigma (x:xs')) xs acc
-
 
 overlaps :: (Term, Term) -> Term
          -> (Substitution -> Term -> (Term, Term))
@@ -97,17 +129,15 @@ overlaps (l, r) tm@(Compound f xs) rfn =
                Nothing -> [])
    in listcases (overlaps (l, r)) (\sigma a -> rfn sigma (Compound f a)) xs acc
 
-
-crit1 :: Equation -> Equation -> [(Term, Term)]
-crit1 (Eq l1 r1) (Eq l2 r2) =
+crit2 :: Equation -> Equation -> [(Term, Term)]
+crit2 (Eq l1 r1) (Eq l2 r2) =
   overlaps (l1, r1) l2  $ \sigma t -> (subst sigma t, subst sigma r2)
 
-
-criticalPairs :: Equation -> Equation -> [(Term, Term)]
-criticalPairs tm1 tm2 =
+criticalPairs' :: Equation -> Equation -> [(Term, Term)]
+criticalPairs' tm1 tm2 =
   let (tm1', tm2') = renamePair (tm1, tm2)
-   in if tm1 == tm2 then crit1 tm1' tm2'
-                    else nub $ crit1 tm1' tm2' ++ crit1 tm2' tm1'
+   in if tm1 == tm2 then crit2 tm1' tm2'
+                    else nub $ crit2 tm1' tm2' ++ crit2 tm2' tm1'
 
 
 --
@@ -117,6 +147,9 @@ criticalPairs tm1 tm2 =
 x = Var "x"
 y = Var "y"
 z = Var "z"
+a = Compound "a" []
+b = Compound "b" []
+c = Compound "c" []
 
 zero = Compound "O" []
 one = Compound "S" [zero]

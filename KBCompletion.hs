@@ -2,11 +2,15 @@
 
 import Data.List
 import Data.Maybe
+import Prelude    hiding (Ordering)
 
 data Term
   = Var String
   | Compound String [Term]
   deriving Eq
+
+type Substitution = [(String, Term)]
+type Ordering = (String, Int) -> (String, Int) -> Bool
 
 instance Show Term where
   show (Var x) = x
@@ -16,7 +20,10 @@ instance Show Term where
 
 data Equation = Eq (Term, Term)
   deriving Eq
-type Substitution = [(String, Term)]
+
+instance Show Equation where
+  show (Eq(l, r)) = show l ++ " = " ++ show r
+
 
 class Entity a where
   fv :: a -> [String]
@@ -141,28 +148,6 @@ criticalPairs' tm1 tm2 =
                     else nub $ crit2 tm1' tm2' ++ crit2 tm2' tm1'
 
 
---
--- Examples
---
-
-x = Var "x"
-y = Var "y"
-z = Var "z"
-a = Compound "a" []
-b = Compound "b" []
-c = Compound "c" []
-
-zero = Compound "O" []
-one = Compound "S" [zero]
-two = Compound "S" [one]
-three = Compound "S" [two]
-
-axiomIkebuchi :: [Equation]
-axiomIkebuchi =
-  [Eq ((Compound "*" [(Compound "*" [x, y]), (Compound "*" [y, z])]), y)]
-
--- unify (Compound "+" [(Compound "S" [x]), y]) (Compound "+" [one, two])
-
 normalizeAndOrient :: (Term -> Term -> Bool) -> [Equation] -> (Term, Term)
                    -> Maybe Equation
 normalizeAndOrient ord eqs (s, t) =
@@ -221,17 +206,74 @@ complete' ord (eqs, deferred, eq:oldcrits) =
    in complete' ord triplets
 
 
-complete :: [Term] -> [Equation] -> Maybe [Equation]
+complete :: [String] -> [Equation] -> Maybe [Equation]
 complete ordList eqs =
   complete' ord (eqs, [], concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs])
     where
-      -- TODO: ord is wrong
-      ord :: Term -> Term -> Bool
-      ord x y =
-        let (Just xi) = elemIndex x ordList
-            (Just yi) = elemIndex y ordList
-         in xi <= yi
+      ord = lpoGe $ weight ordList
 
+
+lexOrd :: (Term -> Term -> Bool) -> [Term] -> [Term] -> Bool
+lexOrd ord (h1:t1) (h2:t2)
+  | ord h1 h2 = length t1 == length t2
+  | otherwise = h1 == h2 && lexOrd ord t1 t2
+lexOrd ord _ _ = False
+
+
+lpoGt :: Ordering -> Term -> Term -> Bool
+lpoGt w s t =
+  case (s, t) of
+    (_, Var x) -> s /= t &&  elem x (fv s)
+    (Compound f xs, Compound g ys) ->
+      any (\si -> lpoGe w si t) xs ||
+        all (lpoGt w s) ys && f == g && lexOrd (lpoGt w) xs ys ||
+          w (f, length xs) (g, length ys)
+    _ -> False
+
+lpoGe :: Ordering -> Term -> Term -> Bool
+lpoGe w s t = s == t || lpoGt w s t
+
+
+weight :: [String] -> Ordering
+weight list (f, n) (g, m)
+  | f == g    = n > m
+  | otherwise =
+    let (Just fi) = elemIndex f list
+        (Just gi) = elemIndex g list
+     in fi < gi
+
+--
+-- Examples
+--
+
+x = Var "x"
+y = Var "y"
+z = Var "z"
+a = Compound "a" []
+b = Compound "b" []
+c = Compound "c" []
+
+zero = Compound "O" []
+one = Compound "S" [zero]
+two = Compound "S" [one]
+three = Compound "S" [two]
+
+axiomIkebuchi :: [Equation]
+axiomIkebuchi =
+  [Eq (mult (mult x y) (mult y z), y)]
+    where mult x y = Compound "*" [x, y]
+
+axiomsOfGroup :: [Equation]
+axiomsOfGroup =
+  [Eq (mult e x, x),
+   Eq (mult (i x) x, e),
+   Eq (mult (mult x y) z, mult x (mult y z))]
+     where
+       mult x y = Compound "*" [x, y]
+       e = Compound "1" []
+       i x = Compound "i" [x]
+
+-- unify (Compound "+" [(Compound "S" [x]), y]) (Compound "+" [one, two])
 
 {-
 (* ------------------------------------------------------------------------- *)

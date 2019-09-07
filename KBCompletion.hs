@@ -68,7 +68,6 @@ renamePair (tm1, tm2) =
       nms2 = map (\n -> Var $ "x" ++ show n) [len1 .. (len1 + len2 - 1)]
    in (subst (zip fvs1 nms1) tm1, subst (zip fvs2 nms2) tm2)
 
-
 compose :: Substitution -> (String, Term) -> Substitution
 compose sigma (x, t) =
   sigma ++ [(x, subst sigma t)]
@@ -164,17 +163,18 @@ criticalPairs' crit tm1 tm2 =
 criticalPairs :: Equation -> Equation -> [(Term, Term)]
 criticalPairs = criticalPairs' crit1
 
+orient :: (Term -> Term -> Bool) -> (Term, Term) -> Maybe Equation
+orient ord (s, t)
+  | ord s t   = Just $ Eq (s, t)
+  | ord t s   = Just $ Eq (t, s)
+  | otherwise = Nothing
 
 normalizeAndOrient :: (Term -> Term -> Bool) -> [Equation] -> (Term, Term)
                    -> Maybe Equation
 normalizeAndOrient ord eqs (s, t) =
   let s' = rewrite eqs s
       t' = rewrite eqs t
-      ret
-        | ord s' t' = Just $ Eq (s', t')
-        | ord t' s' = Just $ Eq (t', s')
-        | otherwise = Nothing
-      in ret
+   in orient ord (s', t')
 
 -- rewrite :: [Equation] -> Term -> Term
 -- rewrite axioms tm =
@@ -211,12 +211,14 @@ rewrite1 (Eq(l, r) : axioms) t =
     Just sigma -> Just $ subst sigma r
     Nothing -> rewrite1 axioms t
 
-reportStatus :: ([Equation], [(Term, Term)], [(Term, Term)]) -> IO ()
-reportStatus (eqs, deferred, crits) = do
-  putStrLn $ show (length eqs) ++ " equations and " ++
-    show (length crits) ++ " pending critical pairs; " ++
-      show (length deferred) ++ " deferred"
-  if length crits > 0 then print (head crits) else pure ()
+reportStatus :: ([Equation], [(Term, Term)], [(Term, Term)]) -> [Equation] -> IO ()
+reportStatus (eqs, deferred, crits) eqs0 =
+  if eqs == eqs0 then return () else do
+    putStrLn $ show (length eqs) ++ " equations and " ++
+      show (length crits) ++ " pending critical pairs; " ++
+        show (length deferred) ++ " deferred"
+    print $ eqs !! 0
+    -- if length deferred > 0 then print (deferred !! 0) else pure ()
 
 complete' :: (Term -> Term -> Bool)
          -> ([Equation], [(Term, Term)], [(Term, Term)])
@@ -230,26 +232,50 @@ complete' ord (eqs, deferred, []) =
       print eqs
       -- print deferred
       return Nothing
-complete' ord (eqs, deferred, eq:oldcrits) =
-  let triplets =
-        (case normalizeAndOrient ord eqs eq of
-           Nothing -> (eqs, eq:deferred, oldcrits)
-           Just (Eq (s', t'))
-             | s' == t'  -> (eqs, deferred, oldcrits)
-             | otherwise ->
-               let eq' = Eq(s', t')
-                   eqs' = eq' : eqs
-                   newcrits = foldr ((++) . (criticalPairs eq')) [] eqs'
-                in (eqs', deferred, oldcrits ++ newcrits))
-   in do
-     reportStatus triplets
-     complete' ord triplets
+complete' ord (eqs, deferred, (s, t):oldcrits) = do
+  let s' = rewrite eqs s
+  let t' = rewrite eqs t
+  let triplets
+        | s' == t' = (eqs, deferred, oldcrits)
+        | otherwise =
+          case orient ord (s', t') of
+            Nothing -> (eqs, (s', t'):deferred, oldcrits)
+            Just (Eq (s', t'))
+              | s' == t'  -> (eqs, deferred, oldcrits)
+              | otherwise ->
+                let eq' = Eq(s', t')
+                    eqs' = eq' : eqs
+                    newcrits = concatMap (criticalPairs eq') eqs'
+                 in (eqs', deferred, oldcrits ++ newcrits)
+  reportStatus triplets eqs
+  complete' ord triplets
 
 complete :: [String] -> [Equation] -> IO (Maybe [Equation])
 complete ordList eqs =
   complete' ord (eqs, [], nub $ concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs])
     where
       ord = lpoGe $ weight ordList
+
+interreduce :: [Equation] -> [Equation] -> [Equation]
+interreduce dun eqs =
+  case eqs of
+    [] -> reverse dun
+    (Eq(l, r)):oeqs ->
+      let dun' = if rewrite (dun ++ oeqs) l /= l
+                    then dun
+                    else Eq(l, rewrite (dun ++ eqs) r) : dun
+       in interreduce dun' oeqs
+
+
+completeAndSimplify :: [String] -> [Equation] -> IO (Maybe [Equation])
+completeAndSimplify wts eqs = do
+  let triple = (eqs, [], concat [criticalPairs eq1 eq2 | eq1 <- eqs, eq2 <- eqs])
+  axioms <- complete' ord triple
+  case axioms of
+    Nothing -> return Nothing
+    Just axioms' -> return . Just $ interreduce [] axioms'
+    where
+      ord = lpoGe (weight wts)
 
 
 -- lexicographic ordering between two sequences of alphabets
@@ -339,15 +365,31 @@ eq0 = Eq (mult (mult x y) (mult y z), y)
 eq1 = Eq (mult (Var "x4") (mult (mult (Var "x4") (Var "x5")) (Var "x2")), mult (Var "x4") (Var "x5"))
 eq2 = Eq (mult (mult (Var "x0") (mult (Var "x3") (Var "x4"))) (Var "x4"), mult (Var "x3") (Var "x4"))
 
+e = Compound "e" []
+i x = Compound "i" [x]
 
 axiomsOfGroup :: [Equation]
 axiomsOfGroup =
   [Eq (mult e x, x),
    Eq (mult (i x) x, e),
-   Eq (mult (mult x y) z, mult x (mult y z))]
-     where
-       e = Compound "e" []
-       i x = Compound "i" [x]
+   Eq (mult (mult x y) z, mult x (mult y z))
+  ]
+
+axiomsOfGroupComplete :: [Equation]
+axiomsOfGroupComplete =
+  axiomsOfGroup ++
+    [Eq (i (mult y x), (mult (i x) (i y))),  -- (y * x)' = x' * y'
+     Eq (mult (i y) (mult y x), x),          -- y' * (y * x) = x
+     Eq (mult x (i x), e),                   -- x * x' = e
+     Eq (i e, e),                            -- e' = e
+     Eq (i (i x), x),                        -- x'' = x
+     Eq (mult x e, x),                       -- x * e = x
+     Eq (mult x (mult (i x) y), y)           -- x * (x' * y) = y
+    ]
+
+-- z * y * i(x) * i(z * i(x * i(y))) = e
+-- mult z (mult y (mult (i x) (i (mult z (i (mult x (i y)))))))
+
 
 axiomsOfNat :: [Equation]
 axiomsOfNat =
@@ -355,32 +397,8 @@ axiomsOfNat =
    Eq (plus (succ x) y, plus x (succ y))]
 
 
+
 -- let (x, y) = head $ criticalPairs (head axiomIkebuchi) (head axiomIkebuchi)
 -- let Eq(z, _) = head axiomIkebuchi
 
 -- unify [] (plus (succ x) y, plus one two)
-
-{-
-(* ------------------------------------------------------------------------- *)
-(* Interreduction.                                                           *)
-(* ------------------------------------------------------------------------- *)
-
-let rec interreduce dun eqs =
-  match eqs with
-    (Atom(R("=",[l;r])))::oeqs ->
-        let dun' = if rewrite (dun @ oeqs) l <> l then dun
-                   else mk_eq l (rewrite (dun @ eqs) r)::dun in
-        interreduce dun' oeqs
-  | [] -> rev dun;;
-
-(* ------------------------------------------------------------------------- *)
-(* Overall function with post-simplification (but not dynamically).          *)
-(* ------------------------------------------------------------------------- *)
-
-let complete_and_simplify wts eqs =
-  let ord = lpo_ge (weight wts) in
-  let eqs' = map (fun e -> let l,r = normalize_and_orient ord [] e in
-                           mk_eq l r) eqs in
-  (interreduce [] ** complete ord)
-  (eqs',[],unions(allpairs critical_pairs eqs' eqs'));;
--}

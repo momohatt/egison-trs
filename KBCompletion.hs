@@ -1,5 +1,3 @@
-{-# LANGUAGE PartialTypeSignatures #-}
-
 import Data.List
 import Data.Maybe
 import Prelude    hiding (Ordering)
@@ -109,12 +107,6 @@ crit1 (Eq(l1, r1)) (Eq(l2, r2)) =
         Just sigma ->
           (subst sigma r1, subst sigma $ context r2) : acc
 
-criticalPairs :: Equation -> Equation -> [(Term, Term)]
-criticalPairs tm1 tm2 =
-  let (tm1', tm2') = renamePair (tm1, tm2)
-   in if tm1 == tm2 then crit1 tm1' tm2'
-                    else nub $ crit1 tm1' tm2' ++ crit1 tm2' tm1'
-
 
 -- Implementation in the textbook
 listcases :: (Term -> (Substitution -> Term -> (Term, Term)) -> [(Term, Term)])
@@ -141,11 +133,15 @@ crit2 :: Equation -> Equation -> [(Term, Term)]
 crit2 (Eq(l1, r1)) (Eq(l2, r2)) =
   overlaps (l1, r1) l2  $ \sigma t -> (subst sigma t, subst sigma r2)
 
-criticalPairs' :: Equation -> Equation -> [(Term, Term)]
-criticalPairs' tm1 tm2 =
+criticalPairs' :: (Equation -> Equation -> [(Term, Term)])
+               -> Equation -> Equation -> [(Term, Term)]
+criticalPairs' crit tm1 tm2 =
   let (tm1', tm2') = renamePair (tm1, tm2)
-   in if tm1 == tm2 then crit2 tm1' tm2'
-                    else nub $ crit2 tm1' tm2' ++ crit2 tm2' tm1'
+   in if tm1 == tm2 then crit tm1' tm2'
+                    else nub $ crit tm1' tm2' ++ crit tm2' tm1'
+
+criticalPairs :: Equation -> Equation -> [(Term, Term)]
+criticalPairs = criticalPairs' crit1
 
 
 normalizeAndOrient :: (Term -> Term -> Bool) -> [Equation] -> (Term, Term)
@@ -180,18 +176,19 @@ rewrite axioms tm =
 reportStatus :: ([Equation], [(Term, Term)], [(Term, Term)]) -> IO ()
 reportStatus (eqs, deferred, crits) = do
   putStrLn $ show (length eqs) ++ " equations and " ++
-    show (length crits) ++ " pending critical pairs " ++
+    show (length crits) ++ " pending critical pairs; " ++
       show (length deferred) ++ " deferred"
 
 
 complete' :: (Term -> Term -> Bool)
          -> ([Equation], [(Term, Term)], [(Term, Term)])
-         -> Maybe [Equation]
+         -> IO (Maybe [Equation])
 complete' ord (eqs, [], []) =
-  return eqs
-complete' ord (eqs, deferred, []) = do
-  e <- find (isJust . (normalizeAndOrient ord eqs)) deferred
-  complete' ord (eqs, filter (/= e) deferred, [e])
+  return $ Just eqs
+complete' ord (eqs, deferred, []) =
+  case find (isJust . (normalizeAndOrient ord eqs)) deferred of
+    Just e -> complete' ord (eqs, filter (/= e) deferred, [e])
+    Nothing -> return Nothing
 complete' ord (eqs, deferred, eq:oldcrits) =
   let triplets =
         (case normalizeAndOrient ord eqs eq of
@@ -203,10 +200,12 @@ complete' ord (eqs, deferred, eq:oldcrits) =
                    eqs' = eq' : eqs
                    newcrits = foldl (\acc eq -> acc ++ criticalPairs eq' eq) [] eqs'
                 in (eqs', deferred, oldcrits ++ newcrits))
-   in complete' ord triplets
+   in do
+     reportStatus triplets
+     complete' ord triplets
 
 
-complete :: [String] -> [Equation] -> Maybe [Equation]
+complete :: [String] -> [Equation] -> IO (Maybe [Equation])
 complete ordList eqs =
   complete' ord (eqs, [], concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs])
     where
@@ -270,7 +269,7 @@ axiomsOfGroup =
    Eq (mult (mult x y) z, mult x (mult y z))]
      where
        mult x y = Compound "*" [x, y]
-       e = Compound "1" []
+       e = Compound "e" []
        i x = Compound "i" [x]
 
 -- unify (Compound "+" [(Compound "S" [x]), y]) (Compound "+" [one, two])

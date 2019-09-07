@@ -19,7 +19,7 @@ instance Show Term where
   show (Compound "+" [x, y]) = "(" ++ show x ++ " + " ++ show y ++ ")"
   show (Compound f xs) = f ++ "(" ++ intercalate ", " (map show xs) ++ ")"
 
-data Equation = Eq (Term, Term)
+newtype Equation = Eq (Term, Term)
   deriving Eq
 
 instance Show Equation where
@@ -41,10 +41,7 @@ instance Entity Term where
     | otherwise = Var y
   subst1 (x, t) (Compound f xs) = Compound f $ map (subst1 (x, t)) xs
 
-  subst sigma (Var x) =
-    case lookup x sigma of
-      Just y -> y
-      Nothing -> Var x
+  subst sigma (Var x) = fromMaybe (Var x) (lookup x sigma)
   subst sigma (Compound f xs) = Compound f $ map (subst sigma) xs
 
   occur x (Var y) = x == y
@@ -108,7 +105,7 @@ subterms :: Term -> [(Term, Term -> Term)]
 subterms (Var _) = []
 subterms t@(Compound f xs) =
   (t, id) :
-  (map (\(t, context) -> (t, \x -> Compound f $ context x)) $ mapSubterms [] xs)
+  map (\(t, context) -> (t, Compound f . context)) (mapSubterms [] xs)
 
 mapSubterms :: [Term] -> [Term] -> [(Term, Term -> [Term])]
 mapSubterms _ [] = []
@@ -217,8 +214,7 @@ reportStatus (eqs, deferred, crits) eqs0 =
     putStrLn $ show (length eqs) ++ " equations and " ++
       show (length crits) ++ " pending critical pairs; " ++
         show (length deferred) ++ " deferred"
-    print $ eqs !! 0
-    -- if length deferred > 0 then print (deferred !! 0) else pure ()
+    print $ head eqs
 
 complete' :: (Term -> Term -> Bool)
          -> ([Equation], [(Term, Term)], [(Term, Term)])
@@ -226,7 +222,7 @@ complete' :: (Term -> Term -> Bool)
 complete' ord (eqs, [], []) =
   return $ Just eqs
 complete' ord (eqs, deferred, []) =
-  case find (isJust . (normalizeAndOrient ord eqs)) deferred of
+  case find (isJust . normalizeAndOrient ord eqs) deferred of
     Just e -> complete' ord (eqs, filter (/= e) deferred, [e])
     Nothing -> do
       print eqs
@@ -260,7 +256,7 @@ interreduce :: [Equation] -> [Equation] -> [Equation]
 interreduce dun eqs =
   case eqs of
     [] -> reverse dun
-    (Eq(l, r)):oeqs ->
+    Eq(l, r):oeqs ->
       let dun' = if rewrite (dun ++ oeqs) l /= l
                     then dun
                     else Eq(l, rewrite (dun ++ eqs) r) : dun
@@ -378,7 +374,7 @@ axiomsOfGroup =
 axiomsOfGroupComplete :: [Equation]
 axiomsOfGroupComplete =
   axiomsOfGroup ++
-    [Eq (i (mult y x), (mult (i x) (i y))),  -- (y * x)' = x' * y'
+    [Eq (i (mult y x), mult (i x) (i y)),  -- (y * x)' = x' * y'
      Eq (mult (i y) (mult y x), x),          -- y' * (y * x) = x
      Eq (mult x (i x), e),                   -- x * x' = e
      Eq (i e, e),                            -- e' = e

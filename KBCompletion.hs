@@ -1,6 +1,6 @@
 import Data.List
 import Data.Maybe
-import Prelude    hiding (Ordering)
+import Prelude    hiding (Ordering, succ)
 
 data Term
   = Var String
@@ -28,12 +28,18 @@ instance Show Equation where
 
 class Entity a where
   fv :: a -> [String]
+  subst1 :: (String, Term) -> a -> a
   subst :: Substitution -> a -> a
   occur :: String -> a -> Bool
 
 instance Entity Term where
   fv (Var x) = [x]
   fv (Compound f xs) = nub $ concatMap fv xs
+
+  subst1 (x, t) (Var y)
+    | x == y    = t
+    | otherwise = Var y
+  subst1 (x, t) (Compound f xs) = Compound f $ map (subst1 (x, t)) xs
 
   subst sigma (Var x) =
     case lookup x sigma of
@@ -47,10 +53,10 @@ instance Entity Term where
 instance Entity Equation where
   fv (Eq(lhs, rhs)) = nub $ fv lhs ++ fv rhs
 
+  subst1 xt (Eq(lhs, rhs))   = Eq (subst1 xt lhs, subst1 xt rhs)
   subst sigma (Eq(lhs, rhs)) = Eq (subst sigma lhs, subst sigma rhs)
 
   occur x (Eq(lhs, rhs)) = occur x lhs || occur x rhs
-
 
 renamePair :: Entity a => (a, a) -> (a, a)
 renamePair (tm1, tm2) =
@@ -63,41 +69,40 @@ renamePair (tm1, tm2) =
    in (subst (zip fvs1 nms1) tm1, subst (zip fvs2 nms2) tm2)
 
 
-unify :: Term -> Term -> Maybe Substitution
-unify (Var x) tm2@(Var _) = Just [(x, tm2)]
-unify (Var x) tm2@(Compound _ _)
-  | occur x tm2 = Nothing
-  | otherwise   = Just [(x, tm2)]
-unify tm1@(Compound _ _) (Var x)
-  | occur x tm1 = Nothing
-  | otherwise   = Just [(x, tm1)]
-unify (Compound f []) (Compound g [])
-  | f /= g    = Nothing
-  | otherwise = Just []
-unify (Compound f (x:xs)) (Compound g (y:ys))
-  | f /= g    = Nothing
-  | otherwise = do
-    sigma <- unify x y
-    let xs' = map (subst sigma) xs
-    let ys' = map (subst sigma) ys
-    res <- unify (Compound f xs') (Compound g ys')
-    return $ sigma ++ res
-unify _ _ = Nothing
+compose :: Substitution -> (String, Term) -> Substitution
+compose sigma (x, t) =
+  sigma ++ [(x, subst sigma t)]
 
+unify :: Substitution -> [(Term, Term)] -> Maybe Substitution
+unify _ [] = Just []
+unify sigma ((s, t):tms) =
+  case (s, t) of
+    (Var x, Compound _ _) | occur x t -> Nothing
+    (Var x, _) -> do
+      let tms' = map (\(t1, t2) -> (subst1 (x, t) t1, subst1 (x, t) t2)) tms
+      sigma' <- unify sigma tms'
+      return $ sigma' `compose` (x, t)
+    (Compound _ _, Var y) | occur y s -> Nothing
+    (_, Var y) -> do
+      let tms' = map (\(t1, t2) -> (subst1 (y, s) t1, subst1 (y, s) t2)) tms
+      sigma' <- unify sigma tms'
+      return $ sigma' `compose` (y, s)
+    (Compound f xs, Compound g ys)
+      | f /= g                 -> Nothing
+      | length xs /= length ys -> Nothing
+      | otherwise              -> unify sigma (zip xs ys ++ tms)
 
 termMatch :: Substitution -> [(Term, Term)] -> Maybe Substitution
-termMatch env [] = Just env
-termMatch env ((Compound f xs, Compound g ys):oth)
-  | f == g && length xs == length ys = termMatch env (zip xs ys ++ oth)
-  | otherwise = Nothing
-termMatch env ((Var x, t):oth) =
-  case lookup x env of
-    Nothing -> termMatch ((x, t) : env) oth
-    Just t'
-      | t == t' -> termMatch env oth
-      | otherwise -> Nothing
-termMatch env _ = Nothing
-
+termMatch env eqs =
+  case eqs of
+    [] -> Just env
+    (Compound f xs, Compound g ys):oth
+      | f == g && length xs == length ys -> termMatch env (zip xs ys ++ oth)
+    (Var x, t):oth -> case lookup x env of
+                        Nothing -> termMatch ((x, t) : env) oth
+                        Just t' | t == t' -> termMatch env oth
+                        _ -> Nothing
+    _ -> Nothing
 
 -- Non-variable subterms
 subterms :: Term -> [(Term, Term -> Term)]
@@ -106,13 +111,11 @@ subterms t@(Compound f xs) =
   (t, id) :
   (map (\(t, context) -> (t, \x -> Compound f $ context x)) $ mapSubterms [] xs)
 
-
 mapSubterms :: [Term] -> [Term] -> [(Term, Term -> [Term])]
 mapSubterms _ [] = []
 mapSubterms prev (x:xs) =
   map (\(t, context) -> (t, \x -> prev ++ context x : xs)) (subterms x)
   ++ mapSubterms (prev ++ [x]) xs
-
 
 crit1 :: Equation -> Equation -> [(Term, Term)]
 crit1 (Eq(l1, r1)) (Eq(l2, r2)) =
@@ -121,11 +124,10 @@ crit1 (Eq(l1, r1)) (Eq(l2, r2)) =
   where
     helper :: [(Term, Term)] -> (Term, Term -> Term) -> [(Term, Term)]
     helper acc (subtm, context) =
-      case unify l2 subtm of
+      case unify [] [(l2, subtm)] of
         Nothing -> acc
         Just sigma ->
           (subst sigma r1, subst sigma $ context r2) : acc
-
 
 -- Implementation in the textbook
 listcases :: (Term -> (Substitution -> Term -> (Term, Term)) -> [(Term, Term)])
@@ -143,7 +145,7 @@ overlaps :: (Term, Term) -> Term
          -> [(Term, Term)]
 overlaps (l, r) (Var _) rfn = []
 overlaps (l, r) tm@(Compound f xs) rfn =
-  let acc = (case unify l tm of
+  let acc = (case unify [] [(l, tm)] of
                Just sth -> [rfn sth r]
                Nothing -> [])
    in listcases (overlaps (l, r)) (\sigma a -> rfn sigma (Compound f a)) xs acc
@@ -160,7 +162,7 @@ criticalPairs' crit tm1 tm2 =
                     else nub $ crit tm1' tm2' ++ crit tm2' tm1'
 
 criticalPairs :: Equation -> Equation -> [(Term, Term)]
-criticalPairs = criticalPairs' crit2
+criticalPairs = criticalPairs' crit1
 
 
 normalizeAndOrient :: (Term -> Term -> Bool) -> [Equation] -> (Term, Term)
@@ -173,7 +175,6 @@ normalizeAndOrient ord eqs (s, t) =
         | ord t' s' = Just $ Eq (t', s')
         | otherwise = Nothing
       in ret
-
 
 -- rewrite :: [Equation] -> Term -> Term
 -- rewrite axioms tm =
@@ -210,13 +211,12 @@ rewrite1 (Eq(l, r) : axioms) t =
     Just sigma -> Just $ subst sigma r
     Nothing -> rewrite1 axioms t
 
-
 reportStatus :: ([Equation], [(Term, Term)], [(Term, Term)]) -> IO ()
 reportStatus (eqs, deferred, crits) = do
   putStrLn $ show (length eqs) ++ " equations and " ++
     show (length crits) ++ " pending critical pairs; " ++
       show (length deferred) ++ " deferred"
-
+  if length crits > 0 then print (head crits) else pure ()
 
 complete' :: (Term -> Term -> Bool)
          -> ([Equation], [(Term, Term)], [(Term, Term)])
@@ -245,7 +245,6 @@ complete' ord (eqs, deferred, eq:oldcrits) =
      reportStatus triplets
      complete' ord triplets
 
-
 complete :: [String] -> [Equation] -> IO (Maybe [Equation])
 complete ordList eqs =
   complete' ord (eqs, [], nub $ concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs])
@@ -261,21 +260,19 @@ lexOrd ord (h1:t1) (h2:t2)
   | otherwise = h1 == h2 && lexOrd ord t1 t2
 lexOrd ord _ _ = False
 
-
 lpoGt :: Ordering -> Term -> Term -> Bool
 lpoGt w s t =
   case (s, t) of
     (_, Var x) -> s /= t &&  elem x (fv s)
     (Compound f xs, Compound g ys) ->
       any (\si -> lpoGe w si t) xs ||
-        all (lpoGt w s) ys && (f == g && lexOrd (lpoGt w) xs ys ||
-          w (f, length xs) (g, length ys))
+        all (lpoGt w s) ys &&
+          (f == g && lexOrd (lpoGt w) xs ys ||
+            w (f, length xs) (g, length ys))
     _ -> False
-
 
 lpoGe :: Ordering -> Term -> Term -> Bool
 lpoGe w s t = s == t || lpoGt w s t
-
 
 weight :: [String] -> Ordering
 weight list (f, n) (g, m)
@@ -283,7 +280,7 @@ weight list (f, n) (g, m)
   | otherwise =
     let (Just fi) = elemIndex f list
         (Just gi) = elemIndex g list
-     in fi < gi
+     in fi > gi
 
 --
 -- Examples
@@ -301,15 +298,47 @@ one = Compound "S" [zero]
 two = Compound "S" [one]
 three = Compound "S" [two]
 
+mult x y = Compound "*" [x, y]
+plus x y = Compound "+" [x, y]
+succ x = Compound "S" [x]
+
 axiomIkebuchi :: [Equation]
 axiomIkebuchi =
   [Eq (mult (mult x y) (mult y z), y)]
-    where mult x y = Compound "*" [x, y]
 
--- (x3 * x4 * x5) * x2 = x4 * x2
--- x4 * (x4 * x5) * x2 = x4 * x5,
--- (x0 * x3 * x4) * x4 = x3 * x4,
--- (x * y) * y * z = y]
+-- eq3 : (x3 * x4 * x5) * x2 = x4 * x2  <- ((x3 * x4 * x5) * x2,(x0 * x4 * x2) * x2)
+-- eq2 : x4 * (x4 * x5) * x2 = x4 * x5,
+-- eq1 : (x0 * x3 * x4) * x4 = x3 * x4,
+-- eq0 : (x * y) * y * z = y
+--
+-- >>> criticalPairs eq0 eq1
+-- [(x1,(x0 * x1) * x1 * x4),
+--  ((x0 * x4) * x5,(x0 * x4) * (x0 * x4 * x5) * x2),
+--  ((x0 * x1) * x1 * x2,(x0 * x1) * x1 * x5),
+--  (x3 * x4,x3 * x4)]
+-- >>> criticalPairs eq0 eq2
+-- [(x3 * x4 * x5,(x0 * x3 * x4 * x5) * x4 * x2),
+--  (x1,(x4 * x1) * x1 * x2),
+--  ((x0 * x1) * x1 * x2,(x3 * x1) * x1 * x2),
+--  (x4 * x5,x4 * x5)]
+-- >>> criticalPairs eq1 eq2
+-- [((x3 * x4 * x5) * x1,(x3 * x4 * x5) * (x4 * x1) * x2),
+--  (x0 * x4 * x5,x0 * x4 * x2),
+--  (x4 * (x4 * x1) * x2,(x3 * x4 * x1) * (x4 * x1) * x2),
+--  ((x3 * x1) * x5,(x3 * x1) * x5)]
+-- >>> criticalPairs eq2 eq2
+-- [((x3 * x4 * x5) * x2,(x0 * x4 * x2) * x2),
+--  (x1 * x2,(x4 * x1 * x2) * x2),
+--  (x1 * x2,x1 * x2)]
+
+--[<<(x5 * x0 * x4) * x4 = (x2 * x0 * x4) * x4>>;
+-- <<(x0 * x3 * x4) * x4 = x3 * x4>>;
+-- <<x3 * x4 = x3 * x4>>]
+
+eq0 = Eq (mult (mult x y) (mult y z), y)
+eq1 = Eq (mult (Var "x4") (mult (mult (Var "x4") (Var "x5")) (Var "x2")), mult (Var "x4") (Var "x5"))
+eq2 = Eq (mult (mult (Var "x0") (mult (Var "x3") (Var "x4"))) (Var "x4"), mult (Var "x3") (Var "x4"))
+
 
 axiomsOfGroup :: [Equation]
 axiomsOfGroup =
@@ -317,23 +346,19 @@ axiomsOfGroup =
    Eq (mult (i x) x, e),
    Eq (mult (mult x y) z, mult x (mult y z))]
      where
-       mult x y = Compound "*" [x, y]
        e = Compound "e" []
        i x = Compound "i" [x]
 
 axiomsOfNat :: [Equation]
 axiomsOfNat =
-  [Eq (add zero x, x),
-   Eq (add (s x) y, add x (s y))]
-     where
-       s x = Compound "S" [x]
-       add x y = Compound "+" [x, y]
+  [Eq (plus zero x, x),
+   Eq (plus (succ x) y, plus x (succ y))]
 
 
 -- let (x, y) = head $ criticalPairs (head axiomIkebuchi) (head axiomIkebuchi)
 -- let Eq(z, _) = head axiomIkebuchi
 
--- unify (Compound "+" [(Compound "S" [x]), y]) (Compound "+" [one, two])
+-- unify [] (plus (succ x) y, plus one two)
 
 {-
 (* ------------------------------------------------------------------------- *)

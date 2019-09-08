@@ -10,7 +10,7 @@ data Term
 
 type Substitution = [(String, Term)]
 type Ordering = (String, Int) -> (String, Int) -> Bool
-type CriticalPair = ((Term, Term), (Equation, Equation))
+type CriticalPair = (Term, Term)
 
 instance Show Term where
   show (Var x) = x

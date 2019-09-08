@@ -73,7 +73,7 @@ crit1 e1@(Eq(l1, r1)) e2@(Eq(l2, r2)) =
       case unify [] [(l2, subtm)] of
         Nothing -> acc
         Just sigma ->
-          ((subst sigma r1, subst sigma $ context r2), (e1, e2)) : acc
+          (subst sigma r1, subst sigma $ context r2) : acc
 
 -- -- Implementation in the textbook
 -- listcases :: (Term -> (Substitution -> Term -> (Term, Term)) -> [(Term, Term)])
@@ -160,12 +160,38 @@ rewrite1 (Eq(l, r) : axioms) t =
 
 reportStatus :: ([Equation], [CriticalPair], [CriticalPair]) -> [Equation] -> IO ()
 reportStatus (eqs, deferred, crits) eqs0 = do
-  -- if eqs == eqs0 then return () else do
-    print $ head crits
+  if eqs == eqs0 then return () else do
     putStrLn $ show (length eqs) ++ " equations and " ++
       show (length crits) ++ " pending critical pairs; " ++
         show (length deferred) ++ " deferred"
     -- print $ head eqs
+
+
+-- one step completion
+complete'' :: (Term -> Term -> Bool)
+         -> ([Equation], [CriticalPair], [CriticalPair])
+         -> ([Equation], [CriticalPair], [CriticalPair])
+complete'' ord (eqs, [], []) = (eqs, [], [])
+complete'' ord (eqs, deferred, []) =
+  case find (isJust . normalizeAndOrient ord eqs) deferred of
+    Just e -> (eqs, filter (/= e) deferred, [e])
+    Nothing -> (eqs, deferred, [])
+complete'' ord (eqs, deferred, (s, t):oldcrits) = do
+  let s' = rewrite eqs s
+  let t' = rewrite eqs t
+  let triplets
+        | s' == t' = (eqs, deferred, oldcrits)
+        | otherwise =
+          case orient ord (s', t') of
+            Nothing -> (eqs, (s', t'):deferred, oldcrits)
+            Just (Eq (s', t'))
+              | s' == t'  -> (eqs, deferred, oldcrits)
+              | otherwise ->
+                let eq' = Eq(s', t')
+                    eqs' = eq' : eqs
+                    newcrits = concatMap (criticalPairs eq') eqs'
+                 in (eqs', deferred, oldcrits ++ newcrits)
+   in triplets
 
 complete' :: (Term -> Term -> Bool)
          -> ([Equation], [CriticalPair], [CriticalPair])
@@ -173,20 +199,20 @@ complete' :: (Term -> Term -> Bool)
 complete' ord (eqs, [], []) =
   return $ Just eqs
 complete' ord (eqs, deferred, []) =
-  case find (isJust . normalizeAndOrient ord eqs . fst) deferred of
+  case find (isJust . normalizeAndOrient ord eqs) deferred of
     Just e -> complete' ord (eqs, filter (/= e) deferred, [e])
     Nothing -> do
       print eqs
       -- print deferred
       return Nothing
-complete' ord (eqs, deferred, ((s, t), e):oldcrits) = do
+complete' ord (eqs, deferred, (s, t):oldcrits) = do
   let s' = rewrite eqs s
   let t' = rewrite eqs t
   let triplets
         | s' == t' = (eqs, deferred, oldcrits)
         | otherwise =
           case orient ord (s', t') of
-            Nothing -> (eqs, ((s', t'), e):deferred, oldcrits)
+            Nothing -> (eqs, (s', t'):deferred, oldcrits)
             Just (Eq (s', t'))
               | s' == t'  -> (eqs, deferred, oldcrits)
               | otherwise ->
@@ -203,24 +229,25 @@ complete ordList eqs =
     where
       ord = lpoGe $ weight ordList
 
-interreduce :: [Equation] -> [Equation] -> [Equation]
-interreduce dun eqs =
+interreduce' :: [Equation] -> [Equation] -> [Equation]
+interreduce' dun eqs =
   case eqs of
     [] -> reverse dun
     Eq(l, r):oeqs ->
       let dun' = if rewrite (dun ++ oeqs) l /= l
                     then dun
                     else Eq(l, rewrite (dun ++ eqs) r) : dun
-       in interreduce dun' oeqs
+       in interreduce' dun' oeqs
 
+interreduce :: [Equation] -> [Equation]
+interreduce = interreduce' []
 
 completeAndSimplify :: [String] -> [Equation] -> IO (Maybe [Equation])
 completeAndSimplify wts eqs = do
-  let triple = (eqs, [], concat [criticalPairs eq1 eq2 | eq1 <- eqs, eq2 <- eqs])
-  axioms <- complete' ord triple
+  axioms <- complete wts eqs
   case axioms of
     Nothing -> return Nothing
-    Just axioms' -> return . Just $ interreduce [] axioms'
+    Just axioms' -> return . Just $ interreduce axioms'
     where
       ord = lpoGe (weight wts)
 
@@ -309,3 +336,9 @@ axiomsOfNat :: [Equation]
 axiomsOfNat =
   [Eq (plus zero x, x),
    Eq (plus (succ x) y, plus x (succ y))]
+
+
+initTriplets =
+  let eqs = axiomsOfGroup
+   in (eqs, [], nub $ concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs])
+ord = lpoGe $ weight ["e", "i", "*"]

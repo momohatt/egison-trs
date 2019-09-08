@@ -415,15 +415,10 @@ inSpaces :: Parser a -> Parser ()
 inSpaces p = spaces >> p >> spaces
 
 equation :: Parser Equation
-equation = do
-  l <- parseTerm
-  inSpaces $ char '='
-  r <- parseTerm
-  return $ Eq (l, r)
+equation = (curry Eq) <$> parseTerm <*> (inSpaces (char '=') >> parseTerm)
 
 parseTerm :: Parser Term
-parseTerm = try compound
-   <|> var
+parseTerm = try compound <|> var
 
 var :: Parser Term
 var = do
@@ -460,3 +455,10 @@ atom :: Parser Term
 atom = try var
     <|> try app
     <|> parens parseTerm
+
+
+parseEq :: String -> Equation
+parseEq input =
+  case parse equation "" input of
+    Left _ -> error "parser"
+    Right eq -> eq

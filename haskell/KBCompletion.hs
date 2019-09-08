@@ -279,35 +279,6 @@ axiomIkebuchi :: [Equation]
 axiomIkebuchi =
   [Eq (mult (mult x y) (mult y z), y)]
 
--- eq3 : (x3 * x4 * x5) * x2 = x4 * x2  <- ((x3 * x4 * x5) * x2,(x0 * x4 * x2) * x2)
--- eq2 : x4 * (x4 * x5) * x2 = x4 * x5,
--- eq1 : (x0 * x3 * x4) * x4 = x3 * x4,
--- eq0 : (x * y) * y * z = y
---
--- >>> criticalPairs eq0 eq1
--- [(x1,(x0 * x1) * x1 * x4),
---  ((x0 * x4) * x5,(x0 * x4) * (x0 * x4 * x5) * x2),
---  ((x0 * x1) * x1 * x2,(x0 * x1) * x1 * x5),
---  (x3 * x4,x3 * x4)]
--- >>> criticalPairs eq0 eq2
--- [(x3 * x4 * x5,(x0 * x3 * x4 * x5) * x4 * x2),
---  (x1,(x4 * x1) * x1 * x2),
---  ((x0 * x1) * x1 * x2,(x3 * x1) * x1 * x2),
---  (x4 * x5,x4 * x5)]
--- >>> criticalPairs eq1 eq2
--- [((x3 * x4 * x5) * x1,(x3 * x4 * x5) * (x4 * x1) * x2),
---  (x0 * x4 * x5,x0 * x4 * x2),
---  (x4 * (x4 * x1) * x2,(x3 * x4 * x1) * (x4 * x1) * x2),
---  ((x3 * x1) * x5,(x3 * x1) * x5)]
--- >>> criticalPairs eq2 eq2
--- [((x3 * x4 * x5) * x2,(x0 * x4 * x2) * x2),
---  (x1 * x2,(x4 * x1 * x2) * x2),
---  (x1 * x2,x1 * x2)]
-
---[<<(x5 * x0 * x4) * x4 = (x2 * x0 * x4) * x4>>;
--- <<(x0 * x3 * x4) * x4 = x3 * x4>>;
--- <<x3 * x4 = x3 * x4>>]
-
 eq0 = Eq (mult (mult x y) (mult y z), y)
 eq1 = Eq (mult (Var "x4") (mult (mult (Var "x4") (Var "x5")) (Var "x2")), mult (Var "x4") (Var "x5"))
 eq2 = Eq (mult (mult (Var "x0") (mult (Var "x3") (Var "x4"))) (Var "x4"), mult (Var "x3") (Var "x4"))
@@ -325,7 +296,7 @@ axiomsOfGroup =
 axiomsOfGroupComplete :: [Equation]
 axiomsOfGroupComplete =
   axiomsOfGroup ++
-    [Eq (i (mult y x), mult (i x) (i y)),  -- (y * x)' = x' * y'
+    [Eq (i (mult y x), mult (i x) (i y)),    -- (y * x)' = x' * y'
      Eq (mult (i y) (mult y x), x),          -- y' * (y * x) = x
      Eq (mult x (i x), e),                   -- x * x' = e
      Eq (i e, e),                            -- e' = e
@@ -334,18 +305,7 @@ axiomsOfGroupComplete =
      Eq (mult x (mult (i x) y), y)           -- x * (x' * y) = y
     ]
 
--- z * y * i(x) * i(z * i(x * i(y))) = e
--- mult z (mult y (mult (i x) (i (mult z (i (mult x (i y)))))))
-
-
 axiomsOfNat :: [Equation]
 axiomsOfNat =
   [Eq (plus zero x, x),
    Eq (plus (succ x) y, plus x (succ y))]
-
-
-
--- let (x, y) = head $ criticalPairs (head axiomIkebuchi) (head axiomIkebuchi)
--- let Eq(z, _) = head axiomIkebuchi
-
--- unify [] (plus (succ x) y, plus one two)

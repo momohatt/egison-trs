@@ -1,6 +1,9 @@
-import Data.List
-import Data.Maybe
-import Prelude    hiding (Ordering, succ)
+import           Data.List
+import           Data.Maybe
+import           Text.ParserCombinators.Parsec
+import           Text.ParserCombinators.Parsec.Language (haskellDef)
+import qualified Text.ParserCombinators.Parsec.Token    as P
+import           Prelude                                hiding (Ordering, succ)
 
 data Term
   = Var String
@@ -9,6 +12,7 @@ data Term
 
 type Substitution = [(String, Term)]
 type Ordering = (String, Int) -> (String, Int) -> Bool
+type CriticalPair = ((Term, Term), (Equation, Equation))
 
 instance Show Term where
   show (Var x) = x
@@ -113,51 +117,51 @@ mapSubterms prev (x:xs) =
   map (\(t, context) -> (t, \x -> prev ++ context x : xs)) (subterms x)
   ++ mapSubterms (prev ++ [x]) xs
 
-crit1 :: Equation -> Equation -> [(Term, Term)]
-crit1 (Eq(l1, r1)) (Eq(l2, r2)) =
+crit1 :: Equation -> Equation -> [CriticalPair]
+crit1 e1@(Eq(l1, r1)) e2@(Eq(l2, r2)) =
   let subtms = subterms l1
    in foldl helper [] subtms
   where
-    helper :: [(Term, Term)] -> (Term, Term -> Term) -> [(Term, Term)]
+    helper :: [CriticalPair] -> (Term, Term -> Term) -> [CriticalPair]
     helper acc (subtm, context) =
       case unify [] [(l2, subtm)] of
         Nothing -> acc
         Just sigma ->
-          (subst sigma r1, subst sigma $ context r2) : acc
+          ((subst sigma r1, subst sigma $ context r2), (e1, e2)) : acc
 
--- Implementation in the textbook
-listcases :: (Term -> (Substitution -> Term -> (Term, Term)) -> [(Term, Term)])
-          -> (Substitution -> [Term] -> (Term, Term))
-          -> [Term]
-          -> [(Term, Term)]
-          -> [(Term, Term)]
-listcases fn rfn [] acc = acc
-listcases fn rfn (x:xs) acc =
-  fn x (\sigma x' -> rfn sigma (x':xs)) ++
-    listcases fn (\sigma xs' -> rfn sigma (x:xs')) xs acc
+-- -- Implementation in the textbook
+-- listcases :: (Term -> (Substitution -> Term -> (Term, Term)) -> [(Term, Term)])
+--           -> (Substitution -> [Term] -> (Term, Term))
+--           -> [Term]
+--           -> [(Term, Term)]
+--           -> [(Term, Term)]
+-- listcases fn rfn [] acc = acc
+-- listcases fn rfn (x:xs) acc =
+--   fn x (\sigma x' -> rfn sigma (x':xs)) ++
+--     listcases fn (\sigma xs' -> rfn sigma (x:xs')) xs acc
+--
+-- overlaps :: (Term, Term) -> Term
+--          -> (Substitution -> Term -> (Term, Term))
+--          -> [(Term, Term)]
+-- overlaps (l, r) (Var _) rfn = []
+-- overlaps (l, r) tm@(Compound f xs) rfn =
+--   let acc = (case unify [] [(l, tm)] of
+--                Just sth -> [rfn sth r]
+--                Nothing -> [])
+--    in listcases (overlaps (l, r)) (\sigma a -> rfn sigma (Compound f a)) xs acc
+--
+-- crit2 :: Equation -> Equation -> [CriticalPair]
+-- crit2 (Eq(l1, r1)) (Eq(l2, r2)) =
+--   overlaps (l1, r1) l2  $ \sigma t -> (subst sigma t, subst sigma r2)
 
-overlaps :: (Term, Term) -> Term
-         -> (Substitution -> Term -> (Term, Term))
-         -> [(Term, Term)]
-overlaps (l, r) (Var _) rfn = []
-overlaps (l, r) tm@(Compound f xs) rfn =
-  let acc = (case unify [] [(l, tm)] of
-               Just sth -> [rfn sth r]
-               Nothing -> [])
-   in listcases (overlaps (l, r)) (\sigma a -> rfn sigma (Compound f a)) xs acc
-
-crit2 :: Equation -> Equation -> [(Term, Term)]
-crit2 (Eq(l1, r1)) (Eq(l2, r2)) =
-  overlaps (l1, r1) l2  $ \sigma t -> (subst sigma t, subst sigma r2)
-
-criticalPairs' :: (Equation -> Equation -> [(Term, Term)])
-               -> Equation -> Equation -> [(Term, Term)]
+criticalPairs' :: (Equation -> Equation -> [CriticalPair])
+               -> Equation -> Equation -> [CriticalPair]
 criticalPairs' crit tm1 tm2 =
   let (tm1', tm2') = renamePair (tm1, tm2)
    in if tm1 == tm2 then crit tm1' tm2'
                     else nub $ crit tm1' tm2' ++ crit tm2' tm1'
 
-criticalPairs :: Equation -> Equation -> [(Term, Term)]
+criticalPairs :: Equation -> Equation -> [CriticalPair]
 criticalPairs = criticalPairs' crit1
 
 orient :: (Term -> Term -> Bool) -> (Term, Term) -> Maybe Equation
@@ -208,34 +212,35 @@ rewrite1 (Eq(l, r) : axioms) t =
     Just sigma -> Just $ subst sigma r
     Nothing -> rewrite1 axioms t
 
-reportStatus :: ([Equation], [(Term, Term)], [(Term, Term)]) -> [Equation] -> IO ()
-reportStatus (eqs, deferred, crits) eqs0 =
-  if eqs == eqs0 then return () else do
+reportStatus :: ([Equation], [CriticalPair], [CriticalPair]) -> [Equation] -> IO ()
+reportStatus (eqs, deferred, crits) eqs0 = do
+  -- if eqs == eqs0 then return () else do
+    print $ head crits
     putStrLn $ show (length eqs) ++ " equations and " ++
       show (length crits) ++ " pending critical pairs; " ++
         show (length deferred) ++ " deferred"
-    print $ head eqs
+    -- print $ head eqs
 
 complete' :: (Term -> Term -> Bool)
-         -> ([Equation], [(Term, Term)], [(Term, Term)])
+         -> ([Equation], [CriticalPair], [CriticalPair])
          -> IO (Maybe [Equation])
 complete' ord (eqs, [], []) =
   return $ Just eqs
 complete' ord (eqs, deferred, []) =
-  case find (isJust . normalizeAndOrient ord eqs) deferred of
+  case find (isJust . normalizeAndOrient ord eqs . fst) deferred of
     Just e -> complete' ord (eqs, filter (/= e) deferred, [e])
     Nothing -> do
       print eqs
       -- print deferred
       return Nothing
-complete' ord (eqs, deferred, (s, t):oldcrits) = do
+complete' ord (eqs, deferred, ((s, t), e):oldcrits) = do
   let s' = rewrite eqs s
   let t' = rewrite eqs t
   let triplets
         | s' == t' = (eqs, deferred, oldcrits)
         | otherwise =
           case orient ord (s', t') of
-            Nothing -> (eqs, (s', t'):deferred, oldcrits)
+            Nothing -> (eqs, ((s', t'), e):deferred, oldcrits)
             Just (Eq (s', t'))
               | s' == t'  -> (eqs, deferred, oldcrits)
               | otherwise ->
@@ -398,3 +403,60 @@ axiomsOfNat =
 -- let Eq(z, _) = head axiomIkebuchi
 
 -- unify [] (plus (succ x) y, plus one two)
+
+----------------------------------- parser -------------------------------------
+
+lexer :: P.TokenParser ()
+lexer = P.makeTokenParser haskellDef
+
+parens = P.parens lexer
+
+inSpaces :: Parser a -> Parser ()
+inSpaces p = spaces >> p >> spaces
+
+equation :: Parser Equation
+equation = do
+  l <- parseTerm
+  inSpaces $ char '='
+  r <- parseTerm
+  return $ Eq (l, r)
+
+parseTerm :: Parser Term
+parseTerm = try compound
+   <|> var
+
+var :: Parser Term
+var = do
+  char 'x'
+  d <- many1 digit
+  return . Var $ 'x' : d
+
+compound :: Parser Term
+compound = try parseMult <|> try parsePlus <|> app
+
+parseMult :: Parser Term
+parseMult = do
+  l <- atom
+  inSpaces $ char '*'
+  r <- try parseMult <|> atom
+  return $ Compound "*" [l, r]
+
+parsePlus :: Parser Term
+parsePlus = do
+  l <- atom
+  inSpaces $ char '+'
+  r <- try parsePlus <|> atom
+  return $ Compound "+" [l, r]
+
+app :: Parser Term
+app = do
+  f <- many1 letter
+  char '('
+  xs <- many1 parseTerm
+  char ')'
+  return $ Compound f xs
+
+atom :: Parser Term
+atom = try var
+    <|> try app
+    <|> parens parseTerm

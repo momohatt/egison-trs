@@ -3,46 +3,42 @@
 
 ;;======================= Knuth-Bendix completion ==============================
 
-; rename free variables of each axioms so that they don't collide
-(define $rename-problem
-  (match-lambda [integer (list equation)]
-    {[[$n <nil>]
-      {}]
-     [[$n <cons $e $es>]
-      (let {[$u (zip (efv e)
-                     ; n, n+1, ... の新しいvarを生成
-                     (map (lambda $x <Var x>) (from n)))]}
-        (cons (esubst u e)
-              (rename-problem (+ n (length u)) es)))]}))
+(define $rename-pair
+  (lambda [$eq1 $eq2]
+    (let* {[$fvs1 (efv eq1)]
+           [$fvs2 (efv eq2)]
+           [$sigma1 (zip fvs1 (map (lambda $x <Var x>) (from 0)))]
+           [$sigma2 (zip fvs2 (map (lambda $x <Var x>) (from (length fvs1))))]}
+      [(esubst sigma1 eq1) (esubst sigma2 eq2)]
+      )))
 
-(define $rename-problem'
-  (lambda [$axioms $eq]
-    (let {[$r (rename-problem 0 {eq @axioms})]}
-      [(cdr r) (car r)])))
-
-;; {equation} -> {[term term]}
-(define $critical-pairs
-  (lambda [$axioms]
-    (match-all (rename-problem 0 axioms) (set equation)
-      {[<cons <equation $l1 $r1>
-        <cons <equation (& !,l1 <subterm <unify ,l1 $sigma> $context>) $r2> _>>
-        [(tsubst sigma r2) (tsubst sigma (context r1))]
-        ]
-       })))
-
-;; {equation} -> equation -> {[term term]}
+;; [equation equation] -> {[term term]}
 (define $critical-pairs'
-  (lambda [$axioms $new-axiom]
-    (match-all (rename-problem' axioms new-axiom) [(multiset equation) equation]
-      {[[<cons <equation $l1 $r1> _>
-         <equation (& !,l1 <subterm <unify ,l1 $sigma> $context>) $r2>]
-        [(tsubst sigma r2) (tsubst sigma (context r1))]]
-       [[<cons <equation (later (& !,l1 <subterm <unify ,l1 $sigma> $context>)) $r2> _>
-         <equation $l1 $r1>]
-        [(tsubst sigma r2) (tsubst sigma (context r1))]]
-       })))
+  (match-all-lambda [equation equation]
+    {[[<equation $l1 $r1>
+       <equation (& !,l1 <subterm-nonv <unify ,l1 $sigma> $context>) $r2>]
+      [(tsubst sigma r2) (tsubst sigma (context r1))]]
+     }))
 
-(define $orient-equation
+;; [equation equation] -> {[term term]}
+(define $critical-pairs
+  (match-lambda [equation equation]
+    {[[$eq1 ,eq1] (critical-pairs' (rename-pair [eq1 eq1]))]
+     [[$eq1 $eq2]
+      (let {[[$eq1' $eq2'] (rename-pair [eq1 eq2])]}
+        {@(critical-pairs' [eq1' eq2']) @(critical-pairs' [eq2' eq1'])})]
+     }))
+
+(define $critical-pairs-for-set
+  (lambda [$axioms]
+    (concat
+      (match-all axioms (set equation)
+        {[<cons $eq1 <cons $eq2 _>>
+          (critical-pairs [eq1 eq2])]
+        }))))
+
+; TODO
+(define $orient
   (match-lambda [term term]
     {[[$l $r]
       (if (succ? l r) (eql l r) (eql r l))]}))
@@ -61,17 +57,17 @@
                   [$r' (rewrite axioms (debug/fn show-term r))]}
               (if (eq? l' r')
                   (complete-loop axioms crits')
-                  (let {[$new-axiom
-                         (debug/fn show-equation (orient-equation l' r'))]}
+                  (let* {[$new-axiom (debug/fn show-equation (orient l' r'))]
+                         [$new-crits (concat (map (critical-pairs new-axiom $1) axioms))]}
                     (complete-loop
                       {@axioms new-axiom}
-                      (union crits (critical-pairs' axioms new-axiom))))))
+                      {@crits @new-crits}))))
             ]}))))))
 
 (define $complete
   (lambda [$axioms]
     (complete-loop axioms
-                   (critical-pairs axioms))))
+                   (critical-pairs-for-set axioms))))
 
 ;;==============================================================================
 
@@ -81,3 +77,10 @@
 
 (define $show-critical-pairs
   (col-show/fn show-critical-pair $1))
+
+; [(x3 * x4,(x0 * x3 * x4) * x4),(x4 * x5,x4 * (x4 * x5) * x2),(x1,x1)]
+;
+; {[x4, ((x * w * x4) * (w * x4) * z) * x4 * x5],
+;  [x4, x4],
+;  [x4, (w * x4) * (x * x4 * x5) * (x4 * x5) * z],
+;  [x4, (x * (w * x4) * x4 * x5) * ((w * x4) * x4 * x5) * z]}

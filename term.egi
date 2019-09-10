@@ -12,12 +12,12 @@
       {[<Compound $s $l> {[s l]}]
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (match (term-match {} {[t s]}) (maybe something)
+      {[$s (match (unify {} {[t s]}) (maybe something)
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
             })]}]
-     [<unify' ,$t $> something
-      {[$s (match (term-match {} {[s t]}) (maybe something)
+     [<term-match ,$t $> something
+      {[$s (match (term-match {} {[t s]}) (maybe something)
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
             })]}]
@@ -74,32 +74,26 @@
   (match-all-lambda term
     {[(occur $v) v]}))
 
-; (define $unify
-;   (lambda [$sigma $terms]
-;     (match terms (unordered-pair term)
-;       {[<pair <var $x> <var ,x>>
-;         (Just sigma)]
-;        [<pair <var $x> (& $t !(occur ,x))>
+(define $update
+  (match-lambda [[string term] something]
+    {[[[$x $t] $sigma] {@sigma [x (tsubst sigma t)]}]}))
 
 (define $unify
-  (match-lambda (unordered-pair term)
-    {[<pair <var $x> <var ,x>>
-      (Just {})] ; 成功(空の代入を返す)
-     [<pair <var $x> <var $y>>
-      (Just {[x <Var y>]})]
-     [<pair <var $x> (& $t !(occur ,x))> ; 自由出現しない場合
-      (Just {[x t]})] ; 代入[t/x]を返す
-     [<pair <compound $f <nil>> <compound ,f <nil>>>
-      (Just {})] ; 成功
-     [<pair <compound $f <cons $x $xs>> <compound ,f <cons $y $ys>>>
-      (match (unify x y) (maybe something)
-       {[(nothing) Nothing] ; unifyがすでに失敗している
-        [(just $u1) ; unifiableな場合、単一化子をsingletonから取り出す
-         (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
-                (maybe something)
-          {[(nothing) Nothing] ; 失敗
-           [(just $u2) (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
-     [_ Nothing]}))
+  (lambda [$sigma $term-pairs]
+    (match term-pairs (list (unordered-pair term))
+      {[<nil> (Just sigma)]
+       [<cons [<var $x> (& <compound _ _> (occur ,x))] _>
+        Nothing]
+       [<cons [<var $x> $t] $ps>
+        (let {[$ps' (map (lambda [$t1 $t2] [(tsubst {[x t]} t1) (tsubst {[x t]} t2)]) ps)]}
+          (match (unify sigma ps') (maybe something)
+            {[(nothing) Nothing]
+             [(just $sigma') (Just (update [x t] sigma'))]}))]
+       [<cons [<compound $f $xs> <compound ,f $ys>] $p'>
+        (if (eq? (length xs) (length ys))
+            (unify sigma {@(zip xs ys) @p'})
+            Nothing)]
+       [_ Nothing]})))
 
 (define $term-match
   (lambda [$sigma $term-pairs]

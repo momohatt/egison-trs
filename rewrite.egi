@@ -10,7 +10,7 @@
   (lambda [$axioms $tm]
     (match [tm axioms] [term (multiset equation)]
       {[[<subterm-nonv $subtm $context>
-         <cons <dequation <unify' ,subtm $sigma> $r> _>]
+         <cons <dequation <term-match ,subtm $sigma> $r> _>]
         (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))
         ]
        [_ tm]

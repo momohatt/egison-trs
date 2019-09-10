@@ -9,11 +9,9 @@ renamePair :: Entity a => (a, a) -> (a, a)
 renamePair (tm1, tm2) =
   let fvs1 = fv tm1
       fvs2 = fv tm2
-      len1 = length fvs1
-      len2 = length fvs2
-      nms1 = map (\n -> Var $ "x" ++ show n) [0 .. (len1 - 1)]
-      nms2 = map (\n -> Var $ "x" ++ show n) [len1 .. (len1 + len2 - 1)]
-   in (subst (zip fvs1 nms1) tm1, subst (zip fvs2 nms2) tm2)
+      sigma1 = zip fvs1 $ map (\n -> Var $ "x" ++ show n) [0 .. ]
+      sigma2 = zip fvs2 $ map (\n -> Var $ "x" ++ show n) [(length fvs1) .. ]
+   in (subst sigma1 tm1, subst sigma2 tm2)
 
 compose :: Substitution -> (String, Term) -> Substitution
 compose sigma (x, t) =

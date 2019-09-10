@@ -16,8 +16,6 @@
        [_ tm]
        })))
 
-; (rewrite axioms-ikebuchi (app "*" y z))
-
 (assert-equal "rewrite 1"
   (rewrite axioms-of-nat (app "+" two one))
   three)

@@ -30,9 +30,9 @@
      }))
 
 (define $critical-pairs-for-set
-  (lambda [$axioms]
+  (lambda [$eqs]
     (concat
-      (match-all axioms (set equation)
+      (match-all eqs (set equation)
         {[<cons $eq1 <cons $eq2 _>>
           (critical-pairs [eq1 eq2])]
         }))))
@@ -44,33 +44,36 @@
       (if (succ? l r) (eql l r) (eql r l))]}))
 
 (define $report
-  (lambda [$axioms $crits]
+  (lambda [$eqs $crits]
     (print
-      (S.concat {(show (length axioms)) " axioms, "
+      (S.concat {(show (length eqs)) " eqs, "
                  (show (length crits)) " pending critical pairs"}))))
 
+; TODO: handle deferred critical pairs
 (define $complete-loop
-  (lambda [$axioms $crits]
-    (io (do {[(report axioms crits)]}
+  (lambda [$eqs $crits $deferred]
+    (io (do {[(report eqs crits)]}
       (return
         (match crits (list [term term])
-          {[<nil> axioms]
+          {[<nil> eqs]
            [<cons [$l $r] $crits'>
-            (let {[$l' (rewrite axioms (debug/fn show-term l))]
-                  [$r' (rewrite axioms (debug/fn show-term r))]}
+            (let {[$l' (rewrite eqs (debug/fn show-term l))]
+                  [$r' (rewrite eqs (debug/fn show-term r))]}
               (if (eq? l' r')
-                  (complete-loop axioms crits')
+                  (complete-loop eqs crits' deferred)
                   (let* {[$new-axiom (orient l' r')]
-                         [$new-crits (concat (map (critical-pairs new-axiom $1) axioms))]}
+                         [$new-crits (concat (map (critical-pairs new-axiom $1) eqs))]}
                     (complete-loop
-                      {@axioms new-axiom}
-                      {@crits @new-crits}))))
+                      {@eqs new-axiom}
+                      {@crits @new-crits}
+                      deferred))))
             ]}))))))
 
 (define $complete
-  (lambda [$axioms]
-    (complete-loop axioms
-                   (critical-pairs-for-set axioms))))
+  (lambda [$eqs]
+    (complete-loop eqs
+                   (critical-pairs-for-set eqs)
+                   {})))
 
 ;;==============================================================================
 

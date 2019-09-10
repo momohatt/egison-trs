@@ -12,12 +12,12 @@
       {[<Compound $s $l> {[s l]}]
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (match (unify {} {[t s]}) (maybe something)
+      {[$s (match (unify {} {[s t]}) (maybe something)
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
             })]}]
      [<term-match ,$t $> something
-      {[$s (match (term-match {} {[t s]}) (maybe something)
+      {[$s (match (term-match {} {[s t]}) (maybe something)
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
             })]}]
@@ -136,8 +136,8 @@
      [,"b" 1]
      [,"c" 1]
      [,"d" 1]
-     [,"*" 3]
-     [,"i" 4]
+     [,"i" 3]
+     [,"*" 4]
      [$s (io (do {(print (S.concat {"WARNING: weight of " s " is undefined"}))}
               (return 0)))]}))
 

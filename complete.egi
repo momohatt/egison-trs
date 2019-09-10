@@ -43,12 +43,15 @@
     {[[$l $r]
       (if (succ? l r) (eql l r) (eql r l))]}))
 
+(define $report
+  (lambda [$axioms $crits]
+    (print
+      (S.concat {(show (length axioms)) " axioms, "
+                 (show (length crits)) " pending critical pairs"}))))
+
 (define $complete-loop
   (lambda [$axioms $crits]
-    (io (do
-      {[(print
-          (S.concat {(show (length axioms)) " axioms, "
-                     (show (length crits)) " pending critical pairs"}))]}
+    (io (do {[(report axioms crits)]}
       (return
         (match crits (list [term term])
           {[<nil> axioms]
@@ -57,7 +60,7 @@
                   [$r' (rewrite axioms (debug/fn show-term r))]}
               (if (eq? l' r')
                   (complete-loop axioms crits')
-                  (let* {[$new-axiom (debug/fn show-equation (orient l' r'))]
+                  (let* {[$new-axiom (orient l' r')]
                          [$new-crits (concat (map (critical-pairs new-axiom $1) axioms))]}
                     (complete-loop
                       {@axioms new-axiom}

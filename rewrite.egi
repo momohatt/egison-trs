@@ -11,10 +11,12 @@
     (match [tm axioms] [term (multiset equation)]
       {[[<subterm-nonv $subtm $context>
          <cons <dequation <term-match ,subtm $sigma> $r> _>]
-        (rewrite axioms (debug/fn show-term (context (tsubst sigma r))))
+        (rewrite axioms (context (tsubst sigma r)))
         ]
        [_ tm]
        })))
+
+; (rewrite axioms-ikebuchi (app "*" y z))
 
 (assert-equal "rewrite 1"
   (rewrite axioms-of-nat (app "+" two one))

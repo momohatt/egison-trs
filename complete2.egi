@@ -1,4 +1,5 @@
 ; Implementation of _complete_ term rewriting system in Egison
+; ***DEPRECATED***
 
 (load-file "term.egi")
 

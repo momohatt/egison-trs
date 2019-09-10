@@ -15,8 +15,8 @@
 ;; [equation equation] -> {[term term]}
 (define $critical-pairs'
   (match-all-lambda [equation equation]
-    {[[<equation $l1 $r1>
-       <equation (& !,l1 <subterm-nonv <unify ,l1 $sigma> $context>) $r2>]
+    {[[<dequation $l1 $r1>
+       <dequation (& !,l1 <subterm-nonv <unify ,l1 $sigma> $context>) $r2>]
       [(tsubst sigma r2) (tsubst sigma (context r1))]]
      }))
 

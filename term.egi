@@ -12,12 +12,12 @@
       {[<Compound $s $l> {[s l]}]
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (match (unify t s) (maybe something)
+      {[$s (match (term-match {} {[t s]}) (maybe something)
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
             })]}]
      [<unify' ,$t $> something
-      {[$s (match (unify' s t) (maybe something)
+      {[$s (match (term-match {} {[s t]}) (maybe something)
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
             })]}]
@@ -74,6 +74,13 @@
   (match-all-lambda term
     {[(occur $v) v]}))
 
+; (define $unify
+;   (lambda [$sigma $terms]
+;     (match terms (unordered-pair term)
+;       {[<pair <var $x> <var ,x>>
+;         (Just sigma)]
+;        [<pair <var $x> (& $t !(occur ,x))>
+
 (define $unify
   (match-lambda (unordered-pair term)
     {[<pair <var $x> <var ,x>>
@@ -94,44 +101,22 @@
            [(just $u2) (Just {@u1 @u2})]})]})] ; {@u1 @u2}はu1 ++ u2
      [_ Nothing]}))
 
-; free variables of two terms are treated as if they are disjoint
-(define $unify'
-  (match-lambda [term term]
-    {[[<var $x> <var ,x>]
-      (Just {})] ; 成功(空の代入を返す)
-     [[<var $x> $y]
-      (Just {[x y]})]
-     [[<compound $f <nil>> <compound ,f <nil>>]
-      (Just {})] ; 成功
-     [[<compound $f $xs>
-       ; <compound ,f (& ?(lambda [$ys] (eq? (length xs) (length ys))) $ys)>]
-       <compound ,f $ys>]
-      (match (map2 (unify' $1 $2) xs ys) (multiset (maybe (multiset [integer term])))
-        {[<cons (nothing) _> Nothing]
-         [<cons (just <cons [$x $t] _>) <cons (just <cons [,x !,t] _>) _>>
-          Nothing]
-         [$s {(unique (concat (concat s)))}]}
-        )]
-     [_ Nothing]}))
+(define $term-match
+  (lambda [$sigma $term-pairs]
+    (match term-pairs (list [term term])
+      {[<nil> (Just sigma)]
+       [<cons [<compound $f $xs>
+               <compound ,f (& $ys ?(lambda [$ys] (eq? (length xs) (length ys))))>] $p'>
+        (term-match sigma {@(zip xs ys) @p'})]
+       [<cons [<var $x> $t] $p'>
+        (match sigma (multiset [string term])
+          {[<cons [,x ,t]  _>  (term-match sigma p')]
+           [<cons [,x $t'] _> Nothing]
+           [_        (term-match (cons [x t] sigma) p')]})]
+       [_ Nothing]
+        })))
 
-(assert-equal "unify-1"
-  (unify' (app "+" (app "S" x) y) (app "+" two one))
-  (Just {[0 one] [1 one]}))
-(assert-equal "unify-2"
-  (unify' (p x e) (p (p y y') e))
-  (Just {[0 (p y y')]}))
-(assert-equal "unify-3"
-  (unify' (p x x') (p y y'))
-  (Just {[0 y]}))
-(assert-equal "unify-4"
-  (unify (app "+" (app "S" x) y) (app "+" (app "S" w) (app "S" z)))
-  (Just {[0 w] [1 (app "S" z)]}))
-(assert-equal "unify-5"
-  (unify' (p (p x y) z) (p (p y z) (i (p y z))))
-  (Just {[0 y] [1 z] [2 (i (p y z))]}))
-(assert-equal "unify-6"
-  (unify' (p x x') (p z (i (p y z))))
-  Nothing)
+(term-match {} {[(app "+" (app "S" x) y) (app "+" one two)]})
 
 ; ================================== LPO =======================================
 

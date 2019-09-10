@@ -100,15 +100,13 @@ crit1 e1@(Eq(l1, r1)) e2@(Eq(l2, r2)) =
 -- crit2 (Eq(l1, r1)) (Eq(l2, r2)) =
 --   overlaps (l1, r1) l2  $ \sigma t -> (subst sigma t, subst sigma r2)
 
-criticalPairs' :: (Equation -> Equation -> [CriticalPair])
-               -> Equation -> Equation -> [CriticalPair]
-criticalPairs' crit tm1 tm2 =
-  let (tm1', tm2') = renamePair (tm1, tm2)
-   in if tm1 == tm2 then crit tm1' tm2'
-                    else nub $ crit tm1' tm2' ++ crit tm2' tm1'
-
 criticalPairs :: Equation -> Equation -> [CriticalPair]
 criticalPairs = criticalPairs' crit1
+  where
+    criticalPairs' crit tm1 tm2 =
+      let (tm1', tm2') = renamePair (tm1, tm2)
+       in if tm1 == tm2 then crit tm1' tm2'
+                        else nub $ crit tm1' tm2' ++ crit tm2' tm1'
 
 orient :: (Term -> Term -> Bool) -> (Term, Term) -> Maybe Equation
 orient ord (s, t)
@@ -119,9 +117,7 @@ orient ord (s, t)
 normalizeAndOrient :: (Term -> Term -> Bool) -> [Equation] -> (Term, Term)
                    -> Maybe Equation
 normalizeAndOrient ord eqs (s, t) =
-  let s' = rewrite eqs s
-      t' = rewrite eqs t
-   in orient ord (s', t')
+  orient ord (rewrite eqs s, rewrite eqs t)
 
 -- rewrite :: [Equation] -> Term -> Term
 -- rewrite axioms tm =

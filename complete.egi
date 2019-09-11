@@ -34,40 +34,56 @@
     (concat
       (match-all eqs (set equation)
         {[<cons $eq1 <cons $eq2 _>>
-          (critical-pairs [eq1 eq2])]
+          (critical-pairs' (rename-pair [eq1 eq2]))]
         }))))
 
-; TODO
 (define $orient
-  (match-lambda [term term]
-    {[[$l $r]
-      (if (succ? l r) (eql l r) (eql r l))]}))
+  (lambda [$l $r]
+    (if (succ? l r)
+        (Just (eql l r))
+        (if (succ? r l)
+            (Just (eql r l))
+            Nothing))))
 
 (define $report
-  (lambda [$eqs $crits]
+  (lambda [$eqs $crits $deferred]
     (print
       (S.concat {(show (length eqs)) " eqs, "
-                 (show (length crits)) " pending critical pairs"}))))
+                 (show (length crits)) " pending critical pairs; "
+                 (show (length deferred)) " deferred"}))))
 
 ; TODO: handle deferred critical pairs
 (define $complete-loop
   (lambda [$eqs $crits $deferred]
-    (io (do {[(report eqs crits)]}
+    (io (do {[(report eqs crits deferred)]}
       (return
-        (match crits (list [term term])
-          {[<nil> eqs]
-           [<cons [$l $r] $crits'>
-            (let {[$l' (rewrite eqs (debug/fn show-term l))]
-                  [$r' (rewrite eqs (debug/fn show-term r))]}
+        (match [crits deferred] [(list [term term]) (list [term term])]
+          {[[<nil> <nil>] eqs]
+           [[<nil> <cons [$l $r] $defs'>]
+            (match (orient l r) (maybe something)
+              {[(just $new-axiom)
+                (let {[$new-eqs {@eqs (debug/fn show-equation new-axiom)}]
+                      [$new-crits (concat (map (critical-pairs new-axiom $1) new-eqs))]}
+                  (complete-loop new-eqs new-crits defs))
+                ]
+               [(nothing) {}]})] ; failed completion
+           [[<cons [$l $r] $crits'> _]
+            (let {[$l' (rewrite eqs l)]
+                  [$r' (rewrite eqs r)]}
               (if (eq? l' r')
                   (complete-loop eqs crits' deferred)
-                  (let* {[$new-axiom (orient l' r')]
-                         [$new-crits (concat (map (critical-pairs new-axiom $1) eqs))]}
-                    (complete-loop
-                      {@eqs new-axiom}
-                      {@crits @new-crits}
-                      deferred))))
-            ]}))))))
+                  (match (orient l' r') (maybe something)
+                    {[(just $new-axiom)
+                      (let {[$new-crits (concat (map (critical-pairs new-axiom $1) eqs))]}
+                        (complete-loop
+                          {@eqs (debug/fn show-equation new-axiom)}
+                          {@crits' @new-crits}
+                          deferred))
+                      ]
+                     [(nothing)
+                      (complete-loop eqs crits' (cons [l' r'] deferred))
+                      ]
+                     })))]}))))))
 
 (define $complete
   (lambda [$eqs]

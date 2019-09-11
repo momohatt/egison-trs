@@ -1,11 +1,9 @@
 ; Implementation of term rewriting system in Egison
 
 (load-file "equation.egi")
-(load-file "example.egi")
 
 ; {equation} -> term -> term
-; 1つだけ選ぶ
-; free variables of axioms and tm should be disjoint!!!
+; free variables of axioms and tm should be disjoint
 (define $rewrite
   (lambda [$axioms $tm]
     (match [tm axioms] [term (multiset equation)]
@@ -37,7 +35,7 @@
   (lambda [$axioms $tms]
     (match-all [tms axioms] [(multiset term) (multiset equation)]
       {[[<cons <subterm-nonv $subtm $context> _>
-         <cons <dequation <unify ,subtm $sigma> $r> _>]
+         <cons <equation <term-match ,subtm $sigma> $r> _>]
         (context (tsubst sigma r))]
       })))
 
@@ -58,34 +56,48 @@
 
 ;;==============================================================================
 
-;; (a * a')' = e
-;(define $g1' (i (p a a')))
-;; <PROVEN> with
-;;  (solve g1 axioms-of-groups-complete)
-;(define $g1 (eql g1' e))
-;
-;; (((b * c) * d)' * b)' * d' = c
-;(define $g2' (p (i (p (i (p (p b c) d)) b))
-;                (i d)))
-;; <PROVEN> with
-;;  (solve g2 axioms-of-groups-complete)
-;(define $g2 (eql g2' c))
-;; (((b * c) * d)' * b)' * d'
-;; = (d' * (b * c)' * b)' * d'
-;; = (d' * c' * b' * b)' * d'
-;; = (d' * c' * e)' * d'
-;; = (d' * c')' * d'
-;; = c'' * d'' * d'
-;; = c'' * d * d'
-;; = c'' * e
-;; = c * e
-;; = c
-;
-;; difficult...
-;(define $g3 (eql (p g1' g2') c))
-;
-;; e * a = a
-;(define $g4 (eql (p e a) a))
-;
-;; a' * a = e
-;(define $g5 (eql (p a' a) e))
+(load-file "example.egi")
+
+(assert-equal "rewrite-all-1"
+  (solve axioms-of-nat (eql (app "+" one two) three))
+  <PROVEN>)
+
+(assert-equal "rewrite-all-2"
+  ; with variable
+  ; S(S(x)) + y = x + S(S(y))
+  (solve axioms-of-nat (eql (app "+" (app "S" (app "S" x)) y)
+                            (app "+" x (app "S" (app "S" y)))))
+  <PROVEN>)
+
+
+; (a * a')' = e
+(define $g1' (i (p a a')))
+; <PROVEN> with
+;  (solve axioms-of-groups-complete g1)
+(define $g1 (eql g1' e))
+
+; (((b * c) * d)' * b)' * d' = c
+(define $g2' (p (i (p (i (p (p b c) d)) b))
+                (i d)))
+; <PROVEN> with
+;  (solve axioms-of-groups-complete g2)
+(define $g2 (eql g2' c))
+; (((b * c) * d)' * b)' * d'
+; = (d' * (b * c)' * b)' * d'
+; = (d' * c' * b' * b)' * d'
+; = (d' * c' * e)' * d'
+; = (d' * c')' * d'
+; = c'' * d'' * d'
+; = c'' * d * d'
+; = c'' * e
+; = c * e
+; = c
+
+; difficult...
+(define $g3 (eql (p g1' g2') c))
+
+; e * a = a
+(define $g4 (eql (p e a) a))
+
+; a' * a = e
+(define $g5 (eql (p a' a) e))

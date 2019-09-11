@@ -18,13 +18,12 @@
 
 (define $efv
   (lambda [$eq]
-    (unique
-      (match eq equation
-        {[<equation $l $r> (append (fv l) (fv r))]}))))
+    (match eq equation
+      {[<equation $l $r> (union (fv l) (fv r))]})))
 
 (define $esubst
   (match-lambda [something equation]
-    {[[$u <equation $l $r>] <Equation (tsubst u l) (tsubst u r)>]}))
+    {[[$sigma <equation $l $r>] <Equation (tsubst sigma l) (tsubst sigma r)>]}))
 
 ;;==============================================================================
 

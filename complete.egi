@@ -55,7 +55,9 @@
 ; TODO: handle deferred critical pairs
 (define $complete-loop
   (lambda [$eqs $crits $deferred]
-    (io (do {[(report eqs crits deferred)]}
+    (io (do {[(report eqs crits deferred)]
+             ; [(print (show-critical-pair (car crits)))]
+             }
       (return
         (match [crits deferred] [(list [term term]) (list [term term])]
           {[[<nil> <nil>] eqs]
@@ -64,7 +66,7 @@
               {[(just $new-axiom)
                 (let {[$new-eqs {@eqs (debug/fn show-equation new-axiom)}]
                       [$new-crits (concat (map (critical-pairs new-axiom $1) new-eqs))]}
-                  (complete-loop new-eqs new-crits defs))
+                  (complete-loop new-eqs new-crits defs'))
                 ]
                [(nothing) {}]})] ; failed completion
            [[<cons [$l $r] $crits'> _]
@@ -74,9 +76,10 @@
                   (complete-loop eqs crits' deferred)
                   (match (orient l' r') (maybe something)
                     {[(just $new-axiom)
-                      (let {[$new-crits (concat (map (critical-pairs new-axiom $1) eqs))]}
+                      (let* {[$new-eqs {@eqs (debug/fn show-equation new-axiom)}]
+                             [$new-crits (concat (map (critical-pairs new-axiom $1) new-eqs))]}
                         (complete-loop
-                          {@eqs (debug/fn show-equation new-axiom)}
+                          new-eqs
                           {@crits' @new-crits}
                           deferred))
                       ]

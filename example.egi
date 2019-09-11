@@ -13,8 +13,8 @@
 (define $w' (i w))
 
 (define $axioms-of-groups
-  {(eql (p x x') e)            ; x * x' = e
-   (eql (p x e) x)             ; x * e = x
+  {(eql (p e x) x)             ; e * x = x
+   (eql (p x' x) e)            ; x' * x = e
    (eql (p (p x y) z) (p x (p y z)))
   })
 
@@ -22,10 +22,10 @@
   {@axioms-of-groups
    (eql (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
    (eql (p y' (p y x)) x)      ; y' * (y * x) = x
-   (eql (p x' x) e)            ; x' * x = e
    (eql (i e) e)               ; e' = e
+   (eql (p x x') e)            ; x * x' = e
    (eql (i x') x)              ; x'' = x
-   (eql (p e x) x)             ; e * x = x
+   (eql (p x e) x)             ; x * e = x
    (eql (p x (p x' y)) y)      ; x * (x' * y) = y
   })
 

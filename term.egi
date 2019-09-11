@@ -138,6 +138,8 @@
      [,"d" 1]
      [,"i" 3]
      [,"*" 4]
+     [,"f" 2]
+     [,"g" 3]
      [$s (io (do {(print (S.concat {"WARNING: weight of " s " is undefined"}))}
               (return 0)))]}))
 

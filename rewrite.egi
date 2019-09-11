@@ -9,8 +9,7 @@
     (match [tm axioms] [term (multiset equation)]
       {[[<subterm-nonv $subtm $context>
          <cons <dequation <term-match ,subtm $sigma> $r> _>]
-        (rewrite axioms (context (tsubst sigma r)))
-        ]
+        (rewrite axioms (context (tsubst sigma r)))]
        [_ tm]
        })))
 
@@ -59,7 +58,7 @@
 (load-file "example.egi")
 
 (assert-equal "rewrite-all-1"
-  (solve axioms-of-nat (eql (app "+" one two) three))
+  (solve axioms-of-nat (eql (app "+" two one) three))
   <PROVEN>)
 
 (assert-equal "rewrite-all-2"

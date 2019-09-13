@@ -52,12 +52,9 @@
                  (show (length crits)) " pending critical pairs; "
                  (show (length deferred)) " deferred"}))))
 
-; TODO: handle deferred critical pairs
 (define $complete-loop
   (lambda [$eqs $crits $deferred]
-    (io (do {[(report eqs crits deferred)]
-             ; [(print (show-term-pair (car crits)))]
-             }
+    (io (do {[(report eqs crits deferred)]}
       (return
         (match [crits deferred] [(list [term term]) (list [term term])]
           {[[<nil> <nil>] eqs]
@@ -103,13 +100,8 @@
 (define $show-term-pairs
   (col-show/fn show-term-pair $1))
 
-; [(x3 * x4,(x0 * x3 * x4) * x4),(x4 * x5,x4 * (x4 * x5) * x2),(x1,x1)]
-;
-; {[x4, ((x * w * x4) * (w * x4) * z) * x4 * x5],
-;  [x4, x4],
-;  [x4, (w * x4) * (x * x4 * x5) * (x4 * x5) * z],
-;  [x4, (x * (w * x4) * x4 * x5) * ((w * x4) * x4 * x5) * z]}
-;
+;;==============================================================================
+
 (define $axioms-of-groups-completion-result
   {
    <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>

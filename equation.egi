@@ -2,12 +2,10 @@
 
 (define $equation
   (matcher
-     ; undirected equation
-    {[<equation $ $> [term term]
+    {[<equation $ $> [term term]  ; undirected equation
       {[<Equation $l $r> {[l r] [r l]}]
        [_ {}]}]
-     ; directed equation
-     [<dequation $ $> [term term]
+     [<dequation $ $> [term term] ; directed equation
       {[<Equation $l $r> {[l r]}]
        [_ {}]}]
      [$ something

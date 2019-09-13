@@ -56,7 +56,7 @@
 (define $complete-loop
   (lambda [$eqs $crits $deferred]
     (io (do {[(report eqs crits deferred)]
-             ; [(print (show-critical-pair (car crits)))]
+             ; [(print (show-term-pair (car crits)))]
              }
       (return
         (match [crits deferred] [(list [term term]) (list [term term])]
@@ -96,12 +96,12 @@
 
 ;;==============================================================================
 
-(define $show-critical-pair
+(define $show-term-pair
   (match-lambda [term term]
     {[[$l $r] (S.concat {"[" (show-term l) ", " (show-term r) "]"})]}))
 
-(define $show-critical-pairs
-  (col-show/fn show-critical-pair $1))
+(define $show-term-pairs
+  (col-show/fn show-term-pair $1))
 
 ; [(x3 * x4,(x0 * x3 * x4) * x4),(x4 * x5,x4 * (x4 * x5) * x2),(x1,x1)]
 ;
@@ -109,3 +109,49 @@
 ;  [x4, x4],
 ;  [x4, (w * x4) * (x * x4 * x5) * (x4 * x5) * z],
 ;  [x4, (x * (w * x4) * x4 * x5) * ((w * x4) * x4 * x5) * z]}
+;
+(define $axioms-of-groups-completion-result
+  {
+   <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
+   <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Var 0>}> <Compound "e" {}>>
+   <Equation <Compound "*" {<Compound "*" {<Var 0> <Var 1>}> <Var 2>}> <Compound "*" {<Var 0> <Compound "*" {<Var 1> <Var 2>}>}>>
+   <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Compound "*" {<Var 0> <Var 2>}>}> <Var 2>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "e" {}>}> <Var 3>}> <Var 3>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "i" {<Var 3>}>}> <Compound "e" {}>}> <Var 3>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Var 5>}>}> <Compound "*" {<Var 4> <Compound "*" {<Var 5> <Var 3>}>}>}> <Var 3>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "i" {<Var 0>}>}> <Var 2>}> <Compound "*" {<Var 0> <Var 2>}>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "e" {}>}>}> <Compound "*" {<Var 0> <Var 5>}>}> <Var 5>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "i" {<Var 5>}>}>}> <Compound "*" {<Var 0> <Compound "e" {}>}>}> <Var 5>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Compound "i" {<Compound "*" {<Var 2> <Var 4>}>}> <Var 2>}>}> <Compound "e" {}>}> <Var 4>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 6> <Compound "*" {<Var 7> <Var 5>}>}>}> <Compound "*" {<Var 6> <Compound "*" {<Var 7> <Compound "*" {<Var 5> <Var 4>}>}>}>}> <Var 4>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "i" {<Var 5>}>}>}> <Compound "*" {<Var 0> <Var 7>}>}> <Compound "*" {<Var 5> <Var 7>}>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Var 2>}>}> <Var 0>}>}> <Var 4>}> <Compound "*" {<Var 2> <Var 4>}>>
+   <Equation <Compound "*" {<Var 1> <Compound "i" {<Var 1>}>}> <Compound "e" {}>>
+   <Equation <Compound "*" {<Var 1> <Compound "*" {<Compound "i" {<Var 1>}> <Var 4>}>}> <Var 4>>
+   <Equation <Compound "*" {<Var 1> <Compound "e" {}>}> <Var 1>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Compound "*" {<Var 5> <Compound "i" {<Var 2>}>}>}>}> <Compound "*" {<Var 4> <Var 5>}>}> <Var 2>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 3> <Compound "i" {<Var 2>}>}>}> <Var 3>}> <Var 2>>
+   <Equation <Compound "i" {<Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Compound "*" {<Var 5> <Var 3>}>}>}> <Compound "*" {<Var 4> <Var 5>}>}>}> <Var 3>>
+   <Equation <Compound "i" {<Compound "*" {<Compound "i" {<Var 5>}> <Compound "i" {<Var 3>}>}>}> <Compound "*" {<Var 3> <Var 5>}>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Var 6>}>}> <Var 4>}>}>}> <Var 0>}> <Var 6>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "*" {<Var 8> <Compound "*" {<Var 9> <Var 7>}>}>}>}> <Compound "*" {<Var 0> <Compound "*" {<Var 8> <Compound "*" {<Var 9> <Compound "*" {<Var 7> <Var 6>}>}>}>}>}> <Var 6>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "*" {<Var 2> <Compound "i" {<Var 7>}>}>}>}> <Compound "*" {<Var 0> <Compound "*" {<Var 2> <Var 9>}>}>}> <Compound "*" {<Var 7> <Var 9>}>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "*" {<Compound "i" {<Compound "*" {<Var 7> <Var 9>}>}> <Var 7>}>}>}> <Compound "*" {<Var 0> <Var 11>}>}> <Compound "*" {<Var 9> <Var 11>}>>
+   <Equation <Compound "*" {<Var 3> <Compound "*" {<Compound "i" {<Compound "*" {<Var 1> <Var 3>}>}> <Var 1>}>}> <Compound "e" {}>>
+   <Equation <Compound "*" {<Var 3> <Compound "*" {<Compound "i" {<Compound "*" {<Var 1> <Var 3>}>}> <Compound "*" {<Var 1> <Var 6>}>}>}> <Var 6>>
+   <Equation <Compound "*" {<Var 3> <Compound "i" {<Compound "*" {<Compound "i" {<Var 6>}> <Var 3>}>}>}> <Var 6>>
+   <Equation <Compound "i" {<Compound "*" {<Var 3> <Compound "i" {<Compound "*" {<Var 1> <Var 3>}>}>}>}> <Var 1>>
+   <Equation <Compound "*" {<Var 3> <Compound "*" {<Compound "i" {<Compound "*" {<Var 6> <Compound "*" {<Var 8> <Var 3>}>}>}> <Compound "*" {<Var 6> <Compound "*" {<Var 8> <Var 10>}>}>}>}> <Var 10>>
+   <Equation <Compound "*" {<Var 3> <Compound "*" {<Compound "i" {<Compound "*" {<Compound "i" {<Var 7>}> <Var 3>}>}> <Var 5>}>}> <Compound "*" {<Var 7> <Var 5>}>>
+   <Equation <Compound "i" {<Compound "e" {}>}> <Compound "e" {}>>
+   <Equation <Compound "*" {<Var 3> <Compound "*" {<Var 4> <Compound "i" {<Compound "*" {<Var 3> <Var 4>}>}>}>}> <Compound "e" {}>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 2> <Var 0>}>}> <Var 2>}> <Compound "i" {<Var 0>}>>
+   <Equation <Compound "*" {<Var 3> <Compound "i" {<Compound "i" {<Compound "i" {<Var 3>}>}>}>}> <Compound "e" {}>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 2> <Compound "*" {<Var 4> <Var 0>}>}>}> <Compound "*" {<Var 2> <Var 4>}>}> <Compound "i" {<Var 0>}>>
+   <Equation <Compound "i" {<Compound "*" {<Var 0> <Compound "i" {<Var 5>}>}>}> <Compound "*" {<Var 5> <Compound "i" {<Var 0>}>}>>
+   <Equation <Compound "*" {<Var 4> <Compound "*" {<Var 5> <Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Var 5>}>}> <Var 1>}>}>}> <Var 1>>
+   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 3> <Var 0>}>}> <Compound "*" {<Var 3> <Var 1>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Var 1>}>>
+   <Equation <Compound "i" {<Compound "*" {<Compound "i" {<Var 1>}> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Var 1>}>>
+   <Equation <Compound "i" {<Compound "i" {<Var 0>}>}> <Var 0>>
+   <Equation <Compound "i" {<Compound "*" {<Var 1> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Compound "i" {<Var 1>}>}>>
+ })

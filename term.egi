@@ -7,22 +7,15 @@
     {[<var $> integer
       {[<Var $i> {i}]
        [_ {}]}]
-     ; 関数適用
      [<compound $ $> [string (list term)]
       {[<Compound $s $l> {[s l]}]
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (match (unify {} {[s t]}) (maybe something)
-            {[(just $sigma) {sigma}]
-             [(nothing)     {}]
-            })]}]
+      {[$s (unify {} {[s t]})]}]
      [<term-match ,$t $> something
-      {[$s (match (term-match {} {[s t]}) (maybe something)
-            {[(just $sigma) {sigma}]
-             [(nothing)     {}]
-            })]}]
-     [<subterm $ $> [term something]
-      {[$s (subterm s)]}]
+      {[$s (term-match {} {[s t]})]}]
+     ; [<subterm $ $> [term something]
+     ;  {[$s (subterm s)]}]
      ; subterm at non-variable position
      [<subterm-nonv $ $> [term something]
       {[$s (subterm-nonv s)]}]
@@ -114,6 +107,23 @@
 
 ; ================================== LPO =======================================
 
+(define $weight
+  (match-lambda string
+    {[,"O" 0]
+     [,"S" 1]
+     [,"+" 2]
+     [,"e" 1]
+     [,"a" 1]
+     [,"b" 1]
+     [,"c" 1]
+     [,"d" 1]
+     [,"*" 3]
+     [,"i" 4]
+     [,"f" 2]
+     [,"g" 3]
+     [$s (io (do {(print (S.concat {"WARNING: weight of " s " is undefined"}))}
+              (return 0)))]}))
+
 ; assumes that the two input lists have the same length
 (define $lpo?
   (match-lambda [(list term) (list term)]
@@ -125,23 +135,6 @@
 (define $terminate?
   (lambda [$x $ts]
     (all (succ? x $) ts)))
-
-(define $weight
-  (match-lambda string
-    {[,"O" 0]
-     [,"S" 1]
-     [,"+" 2]
-     [,"e" 1]
-     [,"a" 1]
-     [,"b" 1]
-     [,"c" 1]
-     [,"d" 1]
-     [,"i" 3]
-     [,"*" 4]
-     [,"f" 2]
-     [,"g" 3]
-     [$s (io (do {(print (S.concat {"WARNING: weight of " s " is undefined"}))}
-              (return 0)))]}))
 
 (define $sigord
   (lambda [$f $g]
@@ -155,8 +148,7 @@
        [[,bottom _] <Less>]
        [[_ ,bottom] <Greater>]
        [(| [<compound $f $ss>
-            <compound ,f
-              (& ?(lpo? ss $) ?(terminate? x $))>]
+            <compound ,f (& ?(lpo? ss $) ?(terminate? x $))>]
            [<compound _ <join _ <cons ,y _>>>
             _]
            [<compound _ <join _ <cons $s _>>>

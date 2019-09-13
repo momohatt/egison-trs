@@ -42,8 +42,6 @@
   (match-lambda [term (multiset term) (multiset equations)]
     {[[$goal <cons ,goal _> _]
       <PROVEN>]
-     [[_ <nil> _]
-      <REFUTED>]
      [[$goal $tgt $axioms]
       (rewrite-loop goal (debug/fn show-terms (rewrite-all axioms tgt)) axioms)]
      }))

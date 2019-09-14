@@ -4,13 +4,13 @@ Egison Journal vol.2「Egisonで項書き換え系」のレポジトリです
 
 ## Knuth-Bendix Completion
 ```
-$ egison -l complete.egi
+$ egison -l completion.egi
 > (complete axioms-of-groups) ; takes about 30 minutes
 ```
 
 Completion result:
 ```
-$ egison -l complete.egi
+$ egison -l completion.egi
 > (show-equations axioms-of-groups-completion-result)
 "{e * x = x,
  i(x) * x = e,

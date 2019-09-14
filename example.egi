@@ -1,6 +1,6 @@
 (define $p (app "*" $1 $2)) ; product
 (define $i (app "i" $1))    ; inverse
-(define $e (app "e"))       ; 単位元
+(define $e (app "e"))
 
 (define $a' (i a))
 (define $b' (i b))
@@ -18,6 +18,13 @@
    (eql (p (p x y) z) (p x (p y z)))
   })
 
+(define $axioms-of-groups-right
+  {(eql (p x e) x)             ; x * e = x
+   (eql (p x x') e)            ; x * x' = e
+   (eql (p (p x y) z) (p x (p y z)))
+  })
+
+; Completed axioms-of-groups (interreduced)
 (define $axioms-of-groups-complete
   {@axioms-of-groups
    (eql (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
@@ -50,12 +57,6 @@
 
 (define $g3 (eql (p g1' g2') c))
 
-; e * a = a
-(define $g4 (eql (p e a) a))
-
-; a' * a = e
-(define $g5 (eql (p a' a) e))
-
 ;;==============================================================================
 
 (define $zero  (app "O"))
@@ -85,12 +86,17 @@
 (define $axioms-ikebuchi
   {(eql (op (op x y) (op y z)) y)})
 
+; completion result:
+; {(x * y) * y * z = y,
+;  y * (y * w) * x7 = y * w,
+;  (x4 * x * y) * y = x * y}
+
 ; ex.
 ; ((a * b) * (b * c)) * ((b * c) * c) = b * c
-
-; completion result in PLAR program:
-; [<<(x3 * x0 * x1) * x1 = x0 * x1>>; <<x1 * (x1 * x2) * x5 = x1 * x2>>;
-;  <<(x * y) * y * z = y>>]
+(assert-equal "axioms-ikebuchi"
+  (rewrite (complete axioms-ikebuchi)
+           (op (op (op a b) (op b c)) (op (op b c) c)))
+  (op b c))
 
 ;;==============================================================================
 
@@ -101,4 +107,5 @@
   {(eql (app "f" (app "f" x)) (app "g" x))})
 
 ; completion result:
-; f(g(x)) = g(f(x)), g(x) = g(x)
+; {f(f(x)) = g(x),
+;  g(f(x)) = f(g(x))}

@@ -71,6 +71,7 @@
   (match-lambda [[string term] something]
     {[[[$x $t] $sigma] {@sigma [x (tsubst sigma t)]}]}))
 
+;; {[var term]} -> {[term term]} -> {[var term]}
 (define $unify
   (lambda [$sigma $term-pairs]
     (match term-pairs (list (unordered-pair term))
@@ -88,6 +89,7 @@
             Nothing)]
        [_ Nothing]})))
 
+;; {[var term]} -> {[term term]} -> {[var term]}
 (define $term-match
   (lambda [$sigma $term-pairs]
     (match term-pairs (list [term term])
@@ -107,6 +109,7 @@
 
 ; ================================== LPO =======================================
 
+; ordering of function symbols, given by user
 (define $weight
   (match-lambda string
     {[,"O" 0]
@@ -168,29 +171,23 @@
           <Less>]
        [_ <Undefined>]})))
 
-; x >? y?
+; x \succ? y?
 (define $succ?
   (lambda [$x $y]
     (eq? (ord-t x y) <Greater>)))
 
 ;;==============================================================================
 
-; variables
+; commonly-used variables
 (define $x (var 0))
 (define $y (var 1))
 (define $z (var 2))
 (define $w (var 3))
 
-(define $x4 (var 4))
-(define $x5 (var 5))
-(define $x6 (var 6))
-(define $x7 (var 7))
-(define $x8 (var 8))
-(define $x9 (var 9))
-
+; bottom (used in superposition)
 (define $bottom (var -1))
 
-; constants
+; commonly-used constants
 (define $a (app "a"))
 (define $b (app "b"))
 (define $c (app "c"))

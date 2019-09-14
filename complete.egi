@@ -57,15 +57,20 @@
     (io (do {[(report eqs crits deferred)]}
       (return
         (match [crits deferred] [(list [term term]) (list [term term])]
-          {[[<nil> <nil>] eqs]
+          {; No pending or deferred critical pairs
+           [[<nil> <nil>] eqs]
+           ; No pending critical pairs, but there are some deferred ones
            [[<nil> <cons [$l $r] $defs'>]
-            (match (orient l r) (maybe something)
-              {[(just $new-axiom)
-                (let {[$new-eqs {@eqs (debug/fn show-equation new-axiom)}]
-                      [$new-crits (concat (map (critical-pairs new-axiom $1) new-eqs))]}
-                  (complete-loop new-eqs new-crits defs'))
-                ]
-               [(nothing) {}]})] ; failed completion
+            ; try rewriting and orient them again
+            (let {[$l' (rewrite eqs l)]
+                  [$r' (rewrite eqs r)]}
+              (match (orient l' r') (maybe something)
+                {[(just $new-axiom)
+                  (let* {[$new-eqs {@eqs (debug/fn show-equation new-axiom)}]
+                         [$new-crits (concat (map (critical-pairs new-axiom $1) new-eqs))]}
+                    (complete-loop new-eqs new-crits defs'))
+                  ]
+                 [(nothing) {}]}))] ; completion failed
            [[<cons [$l $r] $crits'> _]
             (let {[$l' (rewrite eqs l)]
                   [$r' (rewrite eqs r)]}
@@ -75,10 +80,7 @@
                     {[(just $new-axiom)
                       (let* {[$new-eqs {@eqs (debug/fn show-equation new-axiom)}]
                              [$new-crits (concat (map (critical-pairs new-axiom $1) new-eqs))]}
-                        (complete-loop
-                          new-eqs
-                          {@crits' @new-crits}
-                          deferred))
+                        (complete-loop new-eqs {@crits' @new-crits} deferred))
                       ]
                      [(nothing)
                       (complete-loop eqs crits' (cons [l' r'] deferred))

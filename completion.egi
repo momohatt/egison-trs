@@ -13,20 +13,11 @@
       )))
 
 ;; [equation equation] -> {[term term]}
-(define $critical-pairs'
+(define $critical-pairs
   (match-all-lambda [equation equation]
     {[[<dequation $l1 $r1>
        <dequation (& !,l1 <subterm-nonv <unify ,l1 $sigma> $context>) $r2>]
       [(tsubst sigma r2) (tsubst sigma (context r1))]]
-     }))
-
-;; [equation equation] -> {[term term]}
-(define $critical-pairs
-  (match-lambda [equation equation]
-    {[[$eq1 ,eq1] (critical-pairs' (rename-pair [eq1 eq1]))]
-     [[$eq1 $eq2]
-      (let {[[$eq1' $eq2'] (rename-pair [eq1 eq2])]}
-        {@(critical-pairs' [eq1' eq2']) @(critical-pairs' [eq2' eq1'])})]
      }))
 
 ;; equation -> {equation} -> {[term term]}
@@ -35,19 +26,19 @@
     (concat
       (match-all axioms (multiset equation)
         {[<cons ,new-axiom _>
-          (critical-pairs' (rename-pair new-axiom new-axiom))]
+          (critical-pairs (rename-pair new-axiom new-axiom))]
          [<cons (& $axiom !,new-axiom) _>
-          {@(critical-pairs' (rename-pair axiom new-axiom))
-           @(critical-pairs' (rename-pair new-axiom axiom))}]
+          {@(critical-pairs (rename-pair axiom new-axiom))
+           @(critical-pairs (rename-pair new-axiom axiom))}]
          }))))
 
+;; {equation} -> {[term term]}
 (define $critical-pairs-for-set
   (lambda [$eqs]
     (concat
       (match-all eqs (set equation)
         {[<cons $eq1 <cons $eq2 _>>
-          (critical-pairs' (rename-pair [eq1 eq2]))]
-        }))))
+          (critical-pairs (rename-pair [eq1 eq2]))]}))))
 
 (define $orient
   (lambda [$l $r]
@@ -116,9 +107,7 @@
 
 (define $complete
   (lambda [$eqs]
-    (complete-loop eqs
-                   (critical-pairs-for-set eqs)
-                   {})))
+    (complete-loop eqs (critical-pairs-for-set eqs) {})))
 
 ;; {equation} -> {equation}
 (define $interreduce

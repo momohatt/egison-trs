@@ -88,7 +88,7 @@
   (lambda [$eqs $crits $deferred]
     (io (do {[(report eqs crits deferred)]}
       (return
-        (match [crits deferred] [(list term-pair) (list term-pair)]
+        (match [crits deferred] [(list term-pair) (multiset term-pair)]
           {; No pending or deferred critical pairs
            [[<nil> <nil>] (interreduce eqs)]
 

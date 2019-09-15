@@ -66,8 +66,21 @@
 
 (define $term'
   (matcher
-    {[<normalize ,$eqs $> something
+    {[<normalize ,$eqs $> term
       {[$s {(rewrite eqs s)}]}]
+     [$ something
+      {[$tgt {tgt}]}]}))
+
+(define $term-pair
+  (matcher
+    {[<normalize-and-orient ,$eqs $> equation
+      {[[$l $r]
+        (let {[$l' (rewrite eqs l)]
+              [$r' (rewrite eqs r)]}
+          (orient l' r'))]
+       [_ {}]}]
+     [[$ $] [term' term']
+      {[[$l $r] {[l r]}]}]
      [$ something
       {[$tgt {tgt}]}]}))
 
@@ -75,34 +88,32 @@
   (lambda [$eqs $crits $deferred]
     (io (do {[(report eqs crits deferred)]}
       (return
-        (match [crits deferred] [(list [term' term']) (list [term' term'])]
+        (match [crits deferred] [(list term-pair) (list term-pair)]
           {; No pending or deferred critical pairs
            [[<nil> <nil>] (interreduce eqs)]
+
            ; No pending critical pairs, but there are some deferred ones
-           [[<nil> <cons [<normalize ,eqs $l> <normalize ,eqs $r>] $defs'>]
-            ; try rewriting and orient them again
-            (match (orient l r) (maybe something)
-              {[(just $new-axiom)
-                (let* {[$new-eqs
-                        {@(interreduce eqs) (debug/fn show-equation new-axiom)}]
-                       [$new-crits
-                        (critical-pairs-for-new-axiom new-axiom new-eqs)]}
-                  (complete-loop new-eqs new-crits defs'))
-                ]
-               [(nothing) {}]})] ; completion failed
-           [[<cons [<normalize ,eqs $l> <normalize ,eqs ,l>] $crits'> _]
+           [[<nil> <cons ?(joinable? $ $) $defs'>]
+            (complete-loop eqs crits defs')]
+           [[<nil> <cons <normalize-and-orient ,eqs $new-axiom> $defs'>]
+            (let* {[$new-eqs
+                     {@(interreduce eqs) (debug/fn show-equation new-axiom)}]
+                   [$new-crits
+                     (critical-pairs-for-new-axiom new-axiom new-eqs)]}
+                   (complete-loop new-eqs new-crits defs'))]
+           [[<nil> _] {}] ; completion failed
+
+           ; There are some pending critical pairs
+           [[<cons ?(joinable? eqs $ $) $crits'> _]
             (complete-loop eqs crits' deferred)]
+           [[<cons <normalize-and-orient ,eqs $new-axiom> $crits'> _]
+            (let* {[$new-eqs
+                     {@(interreduce eqs) (debug/fn show-equation new-axiom)}]
+                   [$new-crits
+                     (critical-pairs-for-new-axiom new-axiom new-eqs)]}
+                   (complete-loop new-eqs {@crits' @new-crits} deferred))]
            [[<cons [<normalize ,eqs $l> <normalize ,eqs $r>] $crits'> _]
-            (match (orient l r) (maybe something)
-              {[(just $new-axiom)
-                (let* {[$new-eqs
-                         {@(interreduce eqs) (debug/fn show-equation new-axiom)}]
-                      [$new-crits
-                        (critical-pairs-for-new-axiom new-axiom new-eqs)]}
-                      (complete-loop new-eqs {@crits' @new-crits} deferred))]
-              [(nothing)
-               (complete-loop eqs crits' (cons [l r] deferred))]
-              })]
+            (complete-loop eqs crits' (cons [l r] deferred))]
            }))))))
 
 (define $complete

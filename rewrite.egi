@@ -29,6 +29,12 @@
   (rewrite axioms-of-nat (app "+" (app "S" x4) (app "S" x5)))
   (app "+" x4 (app "S" (app "S" x5))))
 
+(define $joinable?
+  (lambda [$axioms $s $t]
+    (let {[$s' (rewrite axioms s)]
+          [$t' (rewrite axioms t)]}
+      (eq? s' t'))))
+
 ; {equation} -> {term} -> {term}
 (define $rewrite-all
   (lambda [$axioms $tms]

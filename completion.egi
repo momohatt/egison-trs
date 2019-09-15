@@ -29,6 +29,18 @@
         {@(critical-pairs' [eq1' eq2']) @(critical-pairs' [eq2' eq1'])})]
      }))
 
+;; equation -> {equation} -> {[term term]}
+(define $critical-pairs-for-new-axiom
+  (lambda [$new-axiom $axioms]
+    (concat
+      (match-all axioms (multiset equation)
+        {[<cons ,new-axiom _>
+          (critical-pairs' (rename-pair new-axiom new-axiom))]
+         [<cons (& $axiom !,new-axiom) _>
+          {@(critical-pairs' (rename-pair axiom new-axiom))
+           @(critical-pairs' (rename-pair new-axiom axiom))}]
+         }))))
+
 (define $critical-pairs-for-set
   (lambda [$eqs]
     (concat
@@ -58,7 +70,7 @@
       (return
         (match [crits deferred] [(list [term term]) (list [term term])]
           {; No pending or deferred critical pairs
-           [[<nil> <nil>] eqs]
+           [[<nil> <nil>] (interreduce eqs)]
            ; No pending critical pairs, but there are some deferred ones
            [[<nil> <cons [$l $r] $defs'>]
             ; try rewriting and orient them again
@@ -66,8 +78,9 @@
                   [$r' (rewrite eqs r)]}
               (match (orient l' r') (maybe something)
                 {[(just $new-axiom)
-                  (let* {[$new-eqs {@eqs (debug/fn show-equation new-axiom)}]
-                         [$new-crits (concat (map (critical-pairs new-axiom $1) new-eqs))]}
+                  (let* {[$new-eqs {@(interreduce eqs) (debug/fn show-equation new-axiom)}]
+                         [$new-crits
+                          (critical-pairs-for-new-axiom new-axiom new-eqs)]}
                     (complete-loop new-eqs new-crits defs'))
                   ]
                  [(nothing) {}]}))] ; completion failed
@@ -78,8 +91,10 @@
                   (complete-loop eqs crits' deferred)
                   (match (orient l' r') (maybe something)
                     {[(just $new-axiom)
-                      (let* {[$new-eqs {@eqs (debug/fn show-equation new-axiom)}]
-                             [$new-crits (concat (map (critical-pairs new-axiom $1) new-eqs))]}
+                      (let* {[$new-eqs
+                              {@(interreduce eqs) (debug/fn show-equation new-axiom)}]
+                             [$new-crits
+                              (critical-pairs-for-new-axiom new-axiom new-eqs)]}
                         (complete-loop new-eqs {@crits' @new-crits} deferred))
                       ]
                      [(nothing)
@@ -93,6 +108,14 @@
                    (critical-pairs-for-set eqs)
                    {})))
 
+;; {equation} -> {equation}
+(define $interreduce
+  (match-lambda (multiset equation)
+    {[<cons <dequation $l $r> (& $others ?(joinable? $ l r))>
+      (interreduce (debug/fn show-equations others))]
+     [$axioms axioms]
+     }))
+
 ;;==============================================================================
 
 (define $show-term-pair
@@ -104,6 +127,7 @@
 
 ;;==============================================================================
 
+; completion result without interreduction
 (define $axioms-of-groups-completion-result
   {
    <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
@@ -149,3 +173,17 @@
    <Equation <Compound "i" {<Compound "i" {<Var 0>}>}> <Var 0>>
    <Equation <Compound "i" {<Compound "*" {<Var 1> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Compound "i" {<Var 1>}>}>>
  })
+
+(define $axioms-of-groups-completion-result-interreduced
+  {
+   <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
+   <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Var 0>}> <Compound "e" {}>>
+   <Equation <Compound "*" {<Compound "*" {<Var 0> <Var 1>}> <Var 2>}> <Compound "*" {<Var 0> <Compound "*" {<Var 1> <Var 2>}>}>>
+   <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Compound "*" {<Var 0> <Var 2>}>}> <Var 2>>
+   <Equation <Compound "*" {<Var 1> <Compound "i" {<Var 1>}>}> <Compound "e" {}>>
+   <Equation <Compound "*" {<Var 1> <Compound "*" {<Compound "i" {<Var 1>}> <Var 4>}>}> <Var 4>>
+   <Equation <Compound "*" {<Var 1> <Compound "e" {}>}> <Var 1>>
+   <Equation <Compound "i" {<Compound "e" {}>}> <Compound "e" {}>>
+   <Equation <Compound "i" {<Compound "i" {<Var 0>}>}> <Var 0>>
+   <Equation <Compound "i" {<Compound "*" {<Var 1> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Compound "i" {<Var 1>}>}>>
+   })

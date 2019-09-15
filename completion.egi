@@ -16,20 +16,20 @@
 (define $critical-pairs
   (match-all-lambda [equation equation]
     {[[<dequation $l1 $r1>
-       <dequation (& !,l1 <subterm-nonv <unify ,l1 $sigma> $context>) $r2>]
+       <dequation <subterm-nonv <unify ,l1 $sigma> $context> $r2>]
       [(tsubst sigma r2) (tsubst sigma (context r1))]]
      }))
 
 ;; equation -> {equation} -> {[term term]}
-(define $critical-pairs-for-new-axiom
-  (lambda [$new-axiom $axioms]
+(define $critical-pairs-for-new-eq
+  (lambda [$new-eq $eqs]
     (concat
-      (match-all axioms (multiset equation)
-        {[<cons ,new-axiom _>
-          (critical-pairs (rename-pair new-axiom new-axiom))]
-         [<cons (& $axiom !,new-axiom) _>
-          {@(critical-pairs (rename-pair axiom new-axiom))
-           @(critical-pairs (rename-pair new-axiom axiom))}]
+      (match-all eqs (multiset equation)
+        {[<cons ,new-eq _>
+          (critical-pairs (rename-pair new-eq new-eq))]
+         [<cons (& $eq !,new-eq) _>
+          {@(critical-pairs (rename-pair eq new-eq))
+           @(critical-pairs (rename-pair new-eq eq))}]
          }))))
 
 ;; {equation} -> {[term term]}
@@ -55,28 +55,41 @@
                  (show (length crits)) " pending critical pairs; "
                  (show (length deferred)) " deferred"}))))
 
-(define $term'
-  (matcher
-    {[<normalize ,$eqs $> term
-      {[$s {(rewrite eqs s)}]}]
-     [$ term
-      {[$tgt {tgt}]}]}))
-
 (define $term-pair
   (matcher
     {[<normalize-and-orient ,$eqs $> equation
       {[[$l $r]
         (orient (rewrite eqs l) (rewrite eqs r))]
        [_ {}]}]
-     [[$ $] [term' term']
+     [[$ $] [term term]
       {[[$l $r] {[l r]}]}]
      [$ something
       {[$tgt {tgt}]}]}))
 
+(define $complete-loop-slow
+  (lambda [$eqs $crits]
+    (io (do {[(report eqs crits {})]}
+      (return
+        (match crits (multiset term-pair)
+          {; No pending or deferred critical pairs
+           [<nil> (interreduce eqs)]
+
+           [<cons ?(joinable? eqs $ $) $crits'>
+            (complete-loop-slow eqs crits')]
+           [<cons <normalize-and-orient ,eqs $new-eq> $crits'>
+            (let* {[$new-eqs
+                     {@(interreduce eqs) (debug/fn show-equation new-eq)}]
+                   [$new-crits
+                     (critical-pairs-for-new-eq new-eq new-eqs)]}
+                   (complete-loop-slow new-eqs {@crits' @new-crits}))]
+           [_ {}]
+           }))))))
+
 (define $complete-loop
   (lambda [$eqs $crits $deferred]
-    (io (do {[(report eqs crits deferred)]}
+    (io (do {[(report eqs crits deferred)]} ; 途中経過の出力
       (return
+        ; Note how deferred critical pair should be treated as 'multiset'
         (match [crits deferred] [(list term-pair) (multiset term-pair)]
           {; No pending or deferred critical pairs
            [[<nil> <nil>] (interreduce eqs)]
@@ -84,24 +97,24 @@
            ; No pending critical pairs, but there are some deferred ones
            [[<nil> <cons ?(joinable? $ $) $defs'>]
             (complete-loop eqs crits defs')]
-           [[<nil> <cons <normalize-and-orient ,eqs $new-axiom> $defs'>]
+           [[<nil> <cons <normalize-and-orient ,eqs $new-eq> $defs'>]
             (let* {[$new-eqs
-                     {@(interreduce eqs) (debug/fn show-equation new-axiom)}]
+                     {@(interreduce eqs) (debug/fn show-equation new-eq)}]
                    [$new-crits
-                     (critical-pairs-for-new-axiom new-axiom new-eqs)]}
+                     (critical-pairs-for-new-eq new-eq new-eqs)]}
                    (complete-loop new-eqs new-crits defs'))]
            [[<nil> _] {}] ; completion failed
 
            ; There are some pending critical pairs
            [[<cons ?(joinable? eqs $ $) $crits'> _]
             (complete-loop eqs crits' deferred)]
-           [[<cons <normalize-and-orient ,eqs $new-axiom> $crits'> _]
+           [[<cons <normalize-and-orient ,eqs $new-eq> $crits'> _]
             (let* {[$new-eqs
-                     {@(interreduce eqs) (debug/fn show-equation new-axiom)}]
+                     {@(interreduce eqs) (debug/fn show-equation new-eq)}]
                    [$new-crits
-                     (critical-pairs-for-new-axiom new-axiom new-eqs)]}
+                     (critical-pairs-for-new-eq new-eq new-eqs)]}
                    (complete-loop new-eqs {@crits' @new-crits} deferred))]
-           [[<cons [<normalize ,eqs $l> <normalize ,eqs $r>] $crits'> _]
+           [[<cons [$l $r] $crits'> _]
             (complete-loop eqs crits' (cons [l r] deferred))]
            }))))))
 
@@ -114,7 +127,7 @@
   (match-lambda (multiset equation)
     {[<cons <dequation $l $r> (& $others ?(joinable? $ l r))>
       (interreduce (debug/fn show-equations others))]
-     [$axioms axioms]
+     [$eqs eqs]
      }))
 
 ;;==============================================================================

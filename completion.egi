@@ -17,7 +17,7 @@
   (lambda [$eq1 $eq2]
     (match-all (rename-pair eq1 eq2) [equation equation]
       {[[<dequation $l1 $r1>
-         <dequation <subterm-nonv <unify ,l1 $sigma> $context> $r2>]
+         <dequation <subterm-nonvar <unify ,l1 $sigma> $context> $r2>]
         [(tsubst sigma r2) (tsubst sigma (context r1))]]
        })))
 

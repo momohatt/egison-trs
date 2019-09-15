@@ -3,11 +3,10 @@
 (load-file "equation.egi")
 
 ; {equation} -> term -> term
-; free variables of axioms and tm should be disjoint
 (define $rewrite
   (lambda [$axioms $tm]
     (match [tm axioms] [term (multiset equation)]
-      {[[<subterm-nonv $subtm $context>
+      {[[<subterm-nonvar $subtm $context>
          <cons <dequation <term-match ,subtm $sigma> $r> _>]
         (rewrite axioms (context (tsubst sigma r)))]
        [_ tm]
@@ -17,17 +16,17 @@
   (rewrite axioms-of-nat (app "+" two one))
   three)
 (assert-equal "rewrite 2"
-  (rewrite axioms-of-groups (p (p x4 (i x4)) e))
+  (rewrite axioms-of-groups (p (p (i (var 4)) (var 4)) e))
   e)
 (assert-equal "rewrite 3"
-  (rewrite axioms-of-groups (p (p x4 x5) (i (p x4 x5))))
+  (rewrite axioms-of-groups (p (i (p (var 4) (var 5))) (p (var 4) (var 5))))
   e)
 (assert-equal "rewrite 4"
   (rewrite axioms-of-groups (p e x))
   (p e x))
 (assert-equal "rewrite 5"
-  (rewrite axioms-of-nat (app "+" (app "S" x4) (app "S" x5)))
-  (app "+" x4 (app "S" (app "S" x5))))
+  (rewrite axioms-of-nat (app "+" (app "S" (var 4)) (app "S" (var 5))))
+  (app "+" (var 4) (app "S" (app "S" (var 5)))))
 
 (define $joinable?
   (lambda [$axioms $s $t]
@@ -37,7 +36,7 @@
 (define $rewrite-all
   (lambda [$axioms $tms]
     (match-all [tms axioms] [(multiset term) (multiset equation)]
-      {[[<cons <subterm-nonv $subtm $context> _>
+      {[[<cons <subterm-nonvar $subtm $context> _>
          <cons <equation <term-match ,subtm $sigma> $r> _>]
         (context (tsubst sigma r))]
       })))

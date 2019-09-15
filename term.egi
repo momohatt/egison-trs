@@ -15,8 +15,8 @@
      [<term-match ,$t $> something
       {[$s (term-match {} {[s t]})]}]
      ; subterm at non-variable position
-     [<subterm-nonv $ $> [term something]
-      {[$s (subterm-nonv s)]}]
+     [<subterm-nonvar $ $> [term something]
+      {[$s (subterm-nonvar s)]}]
      [$ something
       {[$tgt {tgt}]}]}))
 
@@ -45,15 +45,15 @@
      [$t [t id]]}))
 
 ;; term -> {term, term -> term}
-(define $subterm-nonv
+(define $subterm-nonvar
   (match-all-lambda term
-    {[<compound $f <join $xs <cons <subterm-nonv $x $context> $xs'>>>
+    {[<compound $f <join $xs <cons <subterm-nonvar $x $context> $xs'>>>
        (let {[$context' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
          [x (compose context context')])]
      [(& !<var _> $t) [t id]]}))
 
-(assert-equal "subterm-nonv"
-  (map fst (subterm-nonv (app "+" x (app "S" y))))
+(assert-equal "subterm-nonvar"
+  (map fst (subterm-nonvar (app "+" x (app "S" y))))
   {(app "S" y) (app "+" x (app "S" y))})
 
 (define $occur
@@ -74,6 +74,8 @@
   (lambda [$sigma $term-pairs]
     (match term-pairs (list (unordered-pair term))
       {[<nil> (Just sigma)]
+       [<cons [<var $x> <var ,x>] $ps>
+        (unify sigma ps)]
        [<cons [<var $x> (& <compound _ _> (occur ,x))] _>
         Nothing]
        [<cons [<var $x> $t] $ps>

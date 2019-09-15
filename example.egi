@@ -26,6 +26,7 @@
    (eql (p x (p (i x) y)) y)         ; x * (i(x) * y) = y
   })
 
+; TODO: この辺りの整理
 ; i(a * i(a)) = e
 (define $g1' (i (p a (i a))))
 (define $g1 (eql g1' e))

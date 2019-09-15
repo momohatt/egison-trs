@@ -16,6 +16,7 @@
             {[(just $sigma) {sigma}]
              [(nothing)     {}]
              })]}]
+     ; TODO: fix subterm
      [<subterm $ $> [term something]
       {[$s (psubterm s)]}]
      [$ something

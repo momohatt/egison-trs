@@ -111,7 +111,9 @@
 (define $weight
   (match-lambda string
     {[,"O" 0]
+     [,"W" 0]
      [,"S" 1]
+     [,"B" 2]
      [,"+" 2]
      [,"e" 1]
      [,"a" 1]

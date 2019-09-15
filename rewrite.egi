@@ -22,8 +22,8 @@
   (rewrite axioms-of-groups (p (i (p (var 4) (var 5))) (p (var 4) (var 5))))
   e)
 (assert-equal "rewrite 4"
-  (rewrite axioms-of-groups (p e x))
-  (p e x))
+  (rewrite axioms-of-groups (p x e))
+  (p x e))
 (assert-equal "rewrite 5"
   (rewrite axioms-of-nat (app "+" (app "S" (var 4)) (app "S" (var 5))))
   (app "+" (var 4) (app "S" (app "S" (var 5)))))
@@ -69,35 +69,16 @@
                             (app "+" x (app "S" (app "S" y)))))
   <PROVEN>)
 
+(define $g1 (eql (i (p a a')) e))
 
-; (a * a')' = e
-(define $g1' (i (p a a')))
-; <PROVEN> with
-;  (solve axioms-of-groups-complete g1)
-(define $g1 (eql g1' e))
+(assert-equal "rewrite-all-3"
+  (solve axioms-of-groups-complete g1)
+  <PROVEN>)
 
-; (((b * c) * d)' * b)' * d' = c
+; i(i((b * c) * d) * b) * i(d) = c
 (define $g2' (p (i (p (i (p (p b c) d)) b))
                 (i d)))
-; <PROVEN> with
-;  (solve axioms-of-groups-complete g2)
-(define $g2 (eql g2' c))
-; (((b * c) * d)' * b)' * d'
-; = (d' * (b * c)' * b)' * d'
-; = (d' * c' * b' * b)' * d'
-; = (d' * c' * e)' * d'
-; = (d' * c')' * d'
-; = c'' * d'' * d'
-; = c'' * d * d'
-; = c'' * e
-; = c * e
-; = c
 
-; difficult...
-(define $g3 (eql (p g1' g2') c))
-
-; e * a = a
-(define $g4 (eql (p e a) a))
-
-; a' * a = e
-(define $g5 (eql (p a' a) e))
+(assert-equal "rewrite"
+  (rewrite axioms-of-groups-complete g2')
+  c)

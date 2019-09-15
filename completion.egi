@@ -70,14 +70,14 @@
       (return
         (match crits (multiset term-pair)
           {; No pending or deferred critical pairs
-           [<nil> (interreduce eqs)]
+           [<nil> eqs]
 
            [<cons ?(joinable? eqs $ $) $crits'>
             (complete-loop-slow eqs crits')]
            [<cons <normalize-and-orient ,eqs $new-eq> $crits'>
             (let {[$new-crits
                     (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop-slow {@(interreduce eqs) new-eq}
+                  (complete-loop-slow (interreduce {@eqs new-eq})
                                       {@crits' @new-crits}))]
            [_ {}]
            }))))))
@@ -88,8 +88,8 @@
       (return
         ; Note how deferred critical pair should be treated as 'multiset'
         (match [crits deferred] [(list term-pair) (multiset term-pair)]
-          {; No pending or deferred critical pairs
-           [[<nil> <nil>] (interreduce eqs)]
+           ; No pending or deferred critical pairs
+          {[[<nil> <nil>] eqs]
 
            ; No pending critical pairs, but there are some deferred ones
            [[<nil> <cons ?(joinable? $ $) $defs'>]
@@ -97,7 +97,7 @@
            [[<nil> <cons <normalize-and-orient ,eqs $new-eq> $defs'>]
             (let {[$new-crits
                     (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop {@(interreduce eqs) new-eq}
+                  (complete-loop (interreduce {@eqs new-eq})
                                  new-crits
                                  defs'))]
            [[<nil> _] {}] ; completion failed
@@ -108,7 +108,7 @@
            [[<cons <normalize-and-orient ,eqs $new-eq> $crits'> _]
             (let {[$new-crits
                     (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop {@(interreduce eqs) new-eq}
+                  (complete-loop (interreduce {@eqs new-eq})
                                  {@crits' @new-crits}
                                  deferred))]
            [[<cons $lr $crits'> _]
@@ -139,7 +139,7 @@
 ;;==============================================================================
 
 ; completion result without interreduction
-(define $axioms-of-groups-completion-result
+(define $axioms-of-groups-completion-result-not-interreduced
   {
    <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
    <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Var 0>}> <Compound "e" {}>>
@@ -185,7 +185,7 @@
    <Equation <Compound "i" {<Compound "*" {<Var 1> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Compound "i" {<Var 1>}>}>>
  })
 
-(define $axioms-of-groups-completion-result-interreduced
+(define $axioms-of-groups-completion-result
   {
    <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
    <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Var 0>}> <Compound "e" {}>>

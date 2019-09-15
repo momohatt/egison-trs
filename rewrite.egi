@@ -31,9 +31,7 @@
 
 (define $joinable?
   (lambda [$axioms $s $t]
-    (let {[$s' (rewrite axioms s)]
-          [$t' (rewrite axioms t)]}
-      (eq? s' t'))))
+    (eq? (rewrite axioms s) (rewrite axioms t))))
 
 ; {equation} -> {term} -> {term}
 (define $rewrite-all

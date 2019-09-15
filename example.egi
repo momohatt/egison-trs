@@ -2,42 +2,32 @@
 (define $i (app "i" $1))    ; inverse
 (define $e (app "e"))
 
-(define $a' (i a))
-(define $b' (i b))
-(define $c' (i c))
-(define $d' (i d))
-
-(define $x' (i x))
-(define $y' (i y))
-(define $z' (i z))
-(define $w' (i w))
-
 (define $axioms-of-groups
   {(eql (p e x) x)             ; e * x = x
-   (eql (p x' x) e)            ; x' * x = e
+   (eql (p (i x) x) e)         ; (i x) * x = e
    (eql (p (p x y) z) (p x (p y z)))
   })
 
 (define $axioms-of-groups-right
   {(eql (p x e) x)             ; x * e = x
-   (eql (p x x') e)            ; x * x' = e
+   (eql (p x (i x)) e)         ; x * (i x) = e
    (eql (p (p x y) z) (p x (p y z)))
   })
 
 ; Completed axioms-of-groups (interreduced)
 (define $axioms-of-groups-complete
   {@axioms-of-groups
-   (eql (i (p y x)) (p x' y')) ; (y * x)' = x' * y'
-   (eql (p y' (p y x)) x)      ; y' * (y * x) = x
-   (eql (i e) e)               ; e' = e
-   (eql (p x x') e)            ; x * x' = e
-   (eql (i x') x)              ; x'' = x
-   (eql (p x e) x)             ; x * e = x
-   (eql (p x (p x' y)) y)      ; x * (x' * y) = y
+   (eql (i (p y x)) (p (i x) (i y))) ; i(y * x) = i(x) * i(y)
+   (eql (p (i y) (p y x)) x)         ; i(y) * (y * x) = x
+   (eql (i e) e)                     ; i(e) = e
+   (eql (p x (i x)) e)               ; x * i(x) = e
+   (eql (i (i x)) x)                 ; i(i(x)) = x
+   (eql (p x e) x)                   ; x * e = x
+   (eql (p x (p (i x) y)) y)         ; x * (i(x) * y) = y
   })
 
-; (a * a')' = e
-(define $g1' (i (p a a')))
+; i(a * i(a)) = e
+(define $g1' (i (p a (i a))))
 (define $g1 (eql g1' e))
 
 ; (((b * c) * d)' * b)' * d' = c

@@ -14,8 +14,6 @@
       {[$s (unify {} {[s t]})]}]
      [<term-match ,$t $> something
       {[$s (term-match {} {[s t]})]}]
-     ; [<subterm $ $> [term something]
-     ;  {[$s (subterm s)]}]
      ; subterm at non-variable position
      [<subterm-nonv $ $> [term something]
       {[$s (subterm-nonv s)]}]
@@ -104,8 +102,6 @@
            [_        (term-match (cons [x t] sigma) p')]})]
        [_ Nothing]
         })))
-
-(term-match {} {[(app "+" (app "S" x) y) (app "+" one two)]})
 
 ; ================================== LPO =======================================
 

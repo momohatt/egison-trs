@@ -68,16 +68,14 @@
   (matcher
     {[<normalize ,$eqs $> term
       {[$s {(rewrite eqs s)}]}]
-     [$ something
+     [$ term
       {[$tgt {tgt}]}]}))
 
 (define $term-pair
   (matcher
     {[<normalize-and-orient ,$eqs $> equation
       {[[$l $r]
-        (let {[$l' (rewrite eqs l)]
-              [$r' (rewrite eqs r)]}
-          (orient l' r'))]
+        (orient (rewrite eqs l) (rewrite eqs r))]
        [_ {}]}]
      [[$ $] [term' term']
       {[[$l $r] {[l r]}]}]

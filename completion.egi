@@ -14,23 +14,20 @@
 
 ;; [equation equation] -> {[term term]}
 (define $critical-pairs
-  (match-all-lambda [equation equation]
-    {[[<dequation $l1 $r1>
-       <dequation <subterm-nonv <unify ,l1 $sigma> $context> $r2>]
-      [(tsubst sigma r2) (tsubst sigma (context r1))]]
-     }))
+  (lambda [$eq1 $eq2]
+    (match-all (rename-pair eq1 eq2) [equation equation]
+      {[[<dequation $l1 $r1>
+         <dequation <subterm-nonv <unify ,l1 $sigma> $context> $r2>]
+        [(tsubst sigma r2) (tsubst sigma (context r1))]]
+       })))
 
 ;; equation -> {equation} -> {[term term]}
 (define $critical-pairs-for-new-eq
-  (lambda [$new-eq $eqs]
-    (concat
-      (match-all eqs (multiset equation)
-        {[<cons ,new-eq _>
-          (critical-pairs (rename-pair new-eq new-eq))]
-         [<cons (& $eq !,new-eq) _>
-          {@(critical-pairs (rename-pair eq new-eq))
-           @(critical-pairs (rename-pair new-eq eq))}]
-         }))))
+  (lambda [$new-eq $old-eqs]
+    {@(critical-pairs new-eq new-eq)
+     @(concat (map (critical-pairs new-eq $) old-eqs))
+     @(concat (map (critical-pairs $ new-eq) old-eqs))
+     }))
 
 ;; {equation} -> {[term term]}
 (define $critical-pairs-for-set
@@ -38,7 +35,7 @@
     (concat
       (match-all eqs (set equation)
         {[<cons $eq1 <cons $eq2 _>>
-          (critical-pairs (rename-pair [eq1 eq2]))]}))))
+          (critical-pairs eq1 eq2)]}))))
 
 (define $orient
   (lambda [$l $r]
@@ -66,6 +63,7 @@
      [$ something
       {[$tgt {tgt}]}]}))
 
+; simpler but slower
 (define $complete-loop-slow
   (lambda [$eqs $crits]
     (io (do {[(report eqs crits {})]}
@@ -77,11 +75,10 @@
            [<cons ?(joinable? eqs $ $) $crits'>
             (complete-loop-slow eqs crits')]
            [<cons <normalize-and-orient ,eqs $new-eq> $crits'>
-            (let* {[$new-eqs
-                     {@(interreduce eqs) (debug/fn show-equation new-eq)}]
-                   [$new-crits
-                     (critical-pairs-for-new-eq new-eq new-eqs)]}
-                   (complete-loop-slow new-eqs {@crits' @new-crits}))]
+            (let {[$new-crits
+                    (critical-pairs-for-new-eq new-eq eqs)]}
+                  (complete-loop-slow {@(interreduce eqs) new-eq}
+                                      {@crits' @new-crits}))]
            [_ {}]
            }))))))
 
@@ -98,24 +95,24 @@
            [[<nil> <cons ?(joinable? $ $) $defs'>]
             (complete-loop eqs crits defs')]
            [[<nil> <cons <normalize-and-orient ,eqs $new-eq> $defs'>]
-            (let* {[$new-eqs
-                     {@(interreduce eqs) (debug/fn show-equation new-eq)}]
-                   [$new-crits
-                     (critical-pairs-for-new-eq new-eq new-eqs)]}
-                   (complete-loop new-eqs new-crits defs'))]
+            (let {[$new-crits
+                    (critical-pairs-for-new-eq new-eq eqs)]}
+                  (complete-loop {@(interreduce eqs) new-eq}
+                                 new-crits
+                                 defs'))]
            [[<nil> _] {}] ; completion failed
 
            ; There are some pending critical pairs
            [[<cons ?(joinable? eqs $ $) $crits'> _]
             (complete-loop eqs crits' deferred)]
            [[<cons <normalize-and-orient ,eqs $new-eq> $crits'> _]
-            (let* {[$new-eqs
-                     {@(interreduce eqs) (debug/fn show-equation new-eq)}]
-                   [$new-crits
-                     (critical-pairs-for-new-eq new-eq new-eqs)]}
-                   (complete-loop new-eqs {@crits' @new-crits} deferred))]
-           [[<cons [$l $r] $crits'> _]
-            (complete-loop eqs crits' (cons [l r] deferred))]
+            (let {[$new-crits
+                    (critical-pairs-for-new-eq new-eq eqs)]}
+                  (complete-loop {@(interreduce eqs) new-eq}
+                                 {@crits' @new-crits}
+                                 deferred))]
+           [[<cons $lr $crits'> _]
+            (complete-loop eqs crits' (cons lr deferred))]
            }))))))
 
 (define $complete

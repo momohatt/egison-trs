@@ -143,9 +143,6 @@
   (lambda [$x $y]
     (match [x y] [term term]
       {[[_ ,x] <Equal>]
-       ; XXX: 'bottom' is used in superposition
-       [[,bottom _] <Less>]
-       [[_ ,bottom] <Greater>]
        [(| [<compound $f $ss>
             <compound ,f (& ?(lpo? ss $) ?(terminate? x $))>]
            [<compound _ <join _ <cons ,y _>>>
@@ -173,9 +170,6 @@
     (eq? (ord-t x y) <Greater>)))
 
 ;;==============================================================================
-
-; bottom (used in superposition)
-(define $bottom (var -1))
 
 (define $show-term
   (match-lambda term

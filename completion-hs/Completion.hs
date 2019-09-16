@@ -74,12 +74,10 @@ crit1 e1@(Eq(l1, r1)) e2@(Eq(l2, r2)) =
           (subst sigma r1, subst sigma $ context r2) : acc
 
 criticalPairs :: Equation -> Equation -> [CriticalPair]
-criticalPairs = criticalPairs' crit1
-  where
-    criticalPairs' crit tm1 tm2 =
-      let (tm1', tm2') = renamePair (tm1, tm2)
-       in if tm1 == tm2 then crit tm1' tm2'
-                        else nub $ crit tm1' tm2' ++ crit tm2' tm1'
+criticalPairs tm1 tm2 =
+  let (tm1', tm2') = renamePair (tm1, tm2)
+   in if tm1 == tm2 then crit1 tm1' tm2'
+                    else crit1 tm1' tm2' ++ crit1 tm2' tm1'
 
 orient :: (Term -> Term -> Bool) -> (Term, Term) -> Maybe Equation
 orient ord (s, t)
@@ -110,71 +108,45 @@ rewrite axioms tm =
         Nothing -> rewrite'' (s, t) xs
 
 reportStatus :: ([Equation], [CriticalPair], [CriticalPair]) -> [Equation] -> IO ()
-reportStatus (eqs, deferred, crits) eqs0 = do
+reportStatus (eqs, crits, deferred) eqs0 = do
   if eqs == eqs0 then return () else do
     putStrLn $ show (length eqs) ++ " equations and " ++
       show (length crits) ++ " pending critical pairs; " ++
         show (length deferred) ++ " deferred"
 
 
--- one step completion
-complete'' :: (Term -> Term -> Bool)
-         -> ([Equation], [CriticalPair], [CriticalPair])
-         -> ([Equation], [CriticalPair], [CriticalPair])
-complete'' ord (eqs, [], []) = (eqs, [], [])
-complete'' ord (eqs, deferred, []) =
-  case find (isJust . normalizeAndOrient ord eqs) deferred of
-    Just e -> (eqs, filter (/= e) deferred, [e])
-    Nothing -> (eqs, deferred, [])
-complete'' ord (eqs, deferred, (s, t):oldcrits) = do
-  let s' = rewrite eqs s
-  let t' = rewrite eqs t
-  let triplets
-        | s' == t' = (eqs, deferred, oldcrits)
-        | otherwise =
-          case orient ord (s', t') of
-            Nothing -> (eqs, (s', t'):deferred, oldcrits)
-            Just (Eq (s', t'))
-              | s' == t'  -> (eqs, deferred, oldcrits)
-              | otherwise ->
-                let eq' = Eq(s', t')
-                    eqs' = eq' : eqs
-                    newcrits = concatMap (criticalPairs eq') eqs'
-                 in (eqs', deferred, oldcrits ++ newcrits)
-   in triplets
-
 complete' :: (Term -> Term -> Bool)
          -> ([Equation], [CriticalPair], [CriticalPair])
          -> IO (Maybe [Equation])
 complete' ord (eqs, [], []) =
   return $ Just eqs
-complete' ord (eqs, deferred, []) =
+complete' ord (eqs, [], deferred) =
   case find (isJust . normalizeAndOrient ord eqs) deferred of
-    Just e -> complete' ord (eqs, filter (/= e) deferred, [e])
+    Just e -> complete' ord (eqs, [e], filter (/= e) deferred)
     Nothing -> do
       print eqs
       return Nothing
-complete' ord (eqs, deferred, (s, t):oldcrits) = do
+complete' ord (eqs, (s, t):oldcrits, deferred) = do
   let s' = rewrite eqs s
   let t' = rewrite eqs t
   let triplets
-        | s' == t' = (eqs, deferred, oldcrits)
+        | s' == t' = (eqs, oldcrits, deferred)
         | otherwise =
           case orient ord (s', t') of
-            Nothing -> (eqs, (s', t'):deferred, oldcrits)
+            Nothing -> (eqs, oldcrits, (s', t'):deferred)
             Just (Eq (s', t'))
               | s' == t'  -> (eqs, deferred, oldcrits)
               | otherwise ->
                 let eq' = Eq(s', t')
-                    eqs' = eq' : eqs
+                    eqs' = interreduce (eq' : eqs)
                     newcrits = concatMap (criticalPairs eq') eqs'
-                 in (eqs', deferred, oldcrits ++ newcrits)
+                 in (eqs', oldcrits ++ newcrits, deferred)
   reportStatus triplets eqs
   complete' ord triplets
 
 complete :: [String] -> [Equation] -> IO (Maybe [Equation])
 complete ordList eqs =
-  complete' ord (eqs, [], nub $ concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs])
+  complete' ord (eqs, nub $ concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs], [])
     where
       ord = lpoGe $ weight ordList
 
@@ -190,16 +162,6 @@ interreduce' dun eqs =
 
 interreduce :: [Equation] -> [Equation]
 interreduce = interreduce' []
-
-completeAndSimplify :: [String] -> [Equation] -> IO (Maybe [Equation])
-completeAndSimplify wts eqs = do
-  axioms <- complete wts eqs
-  case axioms of
-    Nothing -> return Nothing
-    Just axioms' -> return . Just $ interreduce axioms'
-    where
-      ord = lpoGe (weight wts)
-
 
 -- lexicographic ordering between two sequences of alphabets
 -- having the same length

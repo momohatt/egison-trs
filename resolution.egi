@@ -14,13 +14,10 @@
       {[<Equation $l $r> {[l r] [r l]}]
        [_ {}]}]
      [<unify ,$t $> something
-      {[$s (match (punify t s) (maybe something)
-            {[(just $sigma) {sigma}]
-             [(nothing)     {}]
-             })]}]
+      {[$s (punify t s)]}]
      ; TODO: fix subterm
-     [<subterm $ $> [term something]
-      {[$s (psubterm s)]}]
+     [<subterm-nonvar $ $> [term something]
+      {[$s (psubterm-nonvar s)]}]
      [$ something
        {[$tgt {tgt}]}]}))
 
@@ -41,11 +38,11 @@
 (define $eql (lambda [$x $y] <Equation x y>))
 
 ;; prop -> {term, term -> prop}
-(define $psubterm
+(define $psubterm-nonvar
   (match-all-lambda prop
-    {[<pred $f <join $xs <cons <subterm $x $context> $xs'>>>
+    {[<pred $f <join $xs <cons <subterm-nonvar $x $context> $xs'>>>
        [x (lambda [$x] <Pred f (append xs (cons (context x) xs'))>)]]
-     [<equation <subterm $x $context> $r>
+     [<equation <subterm-nonvar $x $context> $r>
        [x (lambda [$x] <Equation (context x) r>)]]
     }))
 
@@ -54,9 +51,9 @@
     (| <pred _ <join _ <cons (occur v) _>>>
        <equation (occur v) _>)))
 
-; (define $pfv
-;   (match-all-lambda prop
-;     [(occur-prop $v) v]))
+(define $pfv
+  (match-all-lambda prop
+    [(occur-prop $v) v]))
 
 (define $cfv
   (lambda [$x]
@@ -66,7 +63,7 @@
 (define $psubst
   (match-lambda [something prop]
     {[[$u <pred $p $xs>]
-       <Pred p (map (tsubst u $1) xs)>]
+       <Pred p (map (tsubst u $) xs)>]
      [[$u <equation $l $r>]
        <Equation (tsubst u l) (tsubst u r)>]}))
 
@@ -87,14 +84,10 @@
   (match-lambda (unordered-pair prop)
     {[[<pred $p <nil>> <pred ,p <nil>>]
       (Just {})]
-     [[<pred $p <cons $x $xs>> <pred ,p <cons $y $ys>>]
-      (match (unify x y) (maybe something)
-       {[(nothing) Nothing]
-        [(just $u1)
-         (match (unify (tsubst u1 <Compound f xs>) (tsubst u1 <Compound f ys>))
-                (maybe something)
-          {[(nothing) Nothing] ; 失敗
-           [(just $u2) (Just {@u1 @u2})]})]})]
+     [[<pred $p $xs> <pred ,p $ys>]
+      (if (eq? (length xs) (length ys))
+          (unify {} (zip xs ys))
+          Nothing)]
      [_ Nothing]
     }))
 
@@ -123,13 +116,6 @@
   (lambda [$cls1 $cls2]
     ((ord-mul ord-lit) (snd cls1) (snd cls2))))
 
-(assert-equal "ord-eq"
-  (ord-eq (eql three two) (eql three one))
-  <Greater>)
-(assert-equal "ord-lit"
-  (ord-lit <Lit 1 (eql three two)> <Lit -1 (eql three one)>)
-  <Less>)
-
 ; "closure sigma * {xs, s = t} is reductive for sigma * s = sigma * t"
 ; xs is not clause but (multiset literal)
 (define $reductive?
@@ -140,13 +126,6 @@
      (and (not (succ? t' s'))
           (neq? s' t')
           (maximal-strict-occur? <Lit 1 (eql s' t')> xs' sigma)))))
-
-(assert-equal "reductive?1"
-  (reductive? three two [#t {<Lit 1 (eql three one)>}] {})
-  #t)
-(assert-equal "reductive?2"
-  (reductive? three two [#t {<Lit -1 (eql three one)>}] {})
-  #f)
 
 ; ls is not clause but (multiset literal)
 (define $maximal-occur?
@@ -170,7 +149,7 @@
      ; match equation
     {[<cons [_ <cons <lit ,1 <equation $s $t>> $xs>]
       <cons [,#f <cons <lit $sign
-           <subterm (& !<var _> <unify ,s $sigma> $s') $env>> $ys>]
+           <subterm-nonvar (& <unify ,s $sigma> $s') $env>> $ys>]
          _>>
       [#f (csubst' sigma {@xs @ys <Lit sign (env t)>})]
      ]
@@ -188,7 +167,7 @@
      ; match equation
     {[<cons [_ <cons <lit ,1 <equation $s $t>> $xs>]
       <cons [,#f <cons <lit $sign
-           <subterm (& !<var _> <unify ,s $sigma> $s') $env>> $ys>]
+           <subterm-nonvar (& <unify ,s $sigma> $s') $env>> $ys>]
          _>>
       [#f (csubst' sigma {@xs @ys <Lit sign (env t)>})]
      ]
@@ -206,7 +185,7 @@
      ; superposition left
     {[(& <cons [_  <cons <lit ,1 <equation $s $t>> $xs>]
          <cons [,#f <cons <lit ,-1
-           <equation (& <subterm (& !<var _> <unify ,s $sigma> $s') $env> $u) $v>>
+           <equation (& <subterm-nonvar (& <unify ,s $sigma> $s') $env> $u) $v>>
              $ys>]
             _>>
          ?(lambda [$z] ; z does not occur
@@ -219,7 +198,7 @@
      ; superposition right
      [(& <cons [_  <cons <lit ,1 <equation $s $t>> $xs>]
          <cons [,#f <cons <lit ,1
-           <equation (& <subterm (& !<var _> <unify ,s $sigma> $s') $env> $u) $v>>
+           <equation (& <subterm-nonvar (& <unify ,s $sigma> $s') $env> $u) $v>>
              $ys>]
             _>>
          ?(lambda [$z] ; z does not occur
@@ -325,34 +304,38 @@
 
 ;;==============================================================================
 
+(load-file "example.egi")
+
 ; P(g(x), y)
 (define $t1 (pred "P" (app "g" x) y))
 ; P(g(g(c)), c)
 (define $t2 (pred "P" (app "g" (app "g" c)) c))
 
 (define $test-occur
-  (lambda [$v $t]
-    (match t term
-      {[(occur ,v) #t]
-       [_ #f]})))
-
-(assert "occur1" (test-occur x t1))
-(assert "occur2" (not (test-occur z t1)))
-
-(assert "fv1"
-  (match (pfv t1) (multiset integer)
-    {[,{0 1} #t]
+  (match-lambda [term prop]
+    {[[<var $x> (occur-prop ,x)] #t]
      [_ #f]}))
-(assert-equal "cfv-eq"
-  (cfv [#t {<Lit 1 (eql x y)> <Lit 1 (pred "P" z w)>}])
-  {0 1 2 3})
 
-(assert-equal "subterm1"
+(assert-equal "occur-1"
+  (test-occur x t1)
+  #t)
+(assert-equal "occur-2"
+  (test-occur z t1)
+  #f)
+
+(assert-equal "fv1"
+  (pfv t1)
+  {0 1})
+(assert-equal "cfv-eq"
+  (cfv [#t {<Lit 1 (eql x y)> <Lit 1 (pred "P" z y)>}])
+  {0 1 2})
+
+(assert-equal "subterm-nonvar-1"
   ; x = (y + (z * w))
-  (match-all (eql x (app "+" y (app "*" z w))) prop
-    {[<subterm (& !<var _> $a) $env> [a (env (var 4))]]})
+  (match-all (eql x (app "+" y (app "*" z x))) prop
+    {[<subterm-nonvar $a $context> [a (context (var 4))]]})
   {[(app "*" z w) (eql (app "+" y (var 4)) x)]
-   [(app "+" y (app "*" z w)) (eql (var 4) x)]})
+   [(app "+" y (app "*" z x)) (eql (var 4) x)]})
 
 ; [z / x, x / y] P(g(x), y) = P(g(z), x)
 (assert-equal "subst1"
@@ -378,12 +361,25 @@
 
 ; t1 = P(g(x), y)
 ; t2 = P(g(g(c)), c)
-(assert-equal "unify1" (unify x x) {{}})
-(assert-equal "unify2" (unify t1 z) {{[2 t1]}})
+(assert-equal "unify-1" (unify {} {[x x]}) {{}})
 ; {[x, g(c)], [y, c]}
-(assert-equal "unify3"
+(assert-equal "unify-2"
   (punify t1 t2)
   {{[0 <Compound "g" {<Compound "c" {}>}>] [1 <Compound "c" {}>]}})
+
+(assert-equal "ord-eq"
+  (ord-eq (eql three two) (eql three one))
+  <Greater>)
+(assert-equal "ord-lit"
+  (ord-lit <Lit 1 (eql three two)> <Lit -1 (eql three one)>)
+  <Less>)
+
+(assert-equal "reductive?1"
+  (reductive? three two [#t {<Lit 1 (eql three one)>}] {})
+  #t)
+(assert-equal "reductive?2"
+  (reductive? three two [#t {<Lit -1 (eql three one)>}] {})
+  #f)
 
 ; ========================= example (group theory) =============================
 

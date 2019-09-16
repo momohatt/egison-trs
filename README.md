@@ -2,19 +2,24 @@
 
 Egison Journal vol.2「Egisonで項書き換え系」のレポジトリです
 
-## Knuth-Bendix Completion
-### How to run
+## Contents
+* `src-egi/` : Egison implementation of Knuth-Bendix completion
+* `src-hs/` : Haskell implementation of Knuth-Bendix completion
+
+## How to run completion
+### Egison
 ```
 $ egison
 > (load-file "completion.egi")
-> (complete axioms-of-groups) ; takes about 5 minutes
+> (show-equations (complete axioms-of-groups)) ; takes about 5 minutes
 ```
 
-#### Instant completion result of `axioms-of-groups`
+### Haskell
 ```
-> (load-file "completion.egi")
-> (show-equations axioms-of-groups-completion-result)
+$ ghci
+> :l Completion.hs
+> complete ["e", "*", "i"] axiomsOfGroups
 ```
 
 ## Acknowledgement
-Part of the program was authored by [Yuichi Nishiwaki](https://github.com/nyuichi).
+Part of the egison program was authored by [Yuichi Nishiwaki](https://github.com/nyuichi).

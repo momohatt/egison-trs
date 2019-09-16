@@ -10,14 +10,7 @@ $ egison
 > (complete axioms-of-groups) ; takes about 5 minutes
 ```
 
-### Completion result of `axioms-of-groups`
-interreduced:
-```
-> (load-file "completion.egi")
-> (show-equations axioms-of-groups-completion-result-interreduced)
-```
-
-not interreduced:
+### Instant completion result of `axioms-of-groups`
 ```
 > (load-file "completion.egi")
 > (show-equations axioms-of-groups-completion-result)

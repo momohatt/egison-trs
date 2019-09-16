@@ -11,14 +11,14 @@ Egison Journal vol.2「Egisonで項書き換え系」のレポジトリです
 ```
 $ egison
 > (load-file "completion.egi")
-> (show-equations (complete axioms-of-groups)) ; takes about 5 minutes
+> (show-equations (complete axioms-of-group)) ; takes about 5 minutes
 ```
 
 ### Haskell
 ```
 $ ghci
 > :l Completion.hs
-> complete ["e", "*", "i"] axiomsOfGroups
+> complete ["e", "*", "i"] axiomsOfGroup
 ```
 
 ## Acknowledgement

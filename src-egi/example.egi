@@ -14,22 +14,22 @@
 (define $i (app "i" $1))    ; inverse
 (define $e (app "e"))
 
-(define $axioms-of-groups
+(define $axioms-of-group
   {(eql (p e x) x)             ; e * x = x
    (eql (p (i x) x) e)         ; (i x) * x = e
    (eql (p (p x y) z) (p x (p y z)))
   })
 
 ; This seems to diverge
-(define $axioms-of-groups-right
+(define $axioms-of-group-right
   {(eql (p x e) x)             ; x * e = x
    (eql (p x (i x)) e)         ; x * (i x) = e
    (eql (p (p x y) z) (p x (p y z)))
   })
 
-; Completed axioms-of-groups (interreduced)
-(define $axioms-of-groups-complete
-  {@axioms-of-groups
+; Completed axioms-of-group (interreduced)
+(define $axioms-of-group-complete
+  {@axioms-of-group
    (eql (i (p y x)) (p (i x) (i y))) ; i(y * x) = i(x) * i(y)
    (eql (p (i y) (p y x)) x)         ; i(y) * (y * x) = x
    (eql (i e) e)                     ; i(e) = e

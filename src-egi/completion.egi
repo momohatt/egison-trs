@@ -139,7 +139,7 @@
 ;;==============================================================================
 
 ; completion result without interreduction
-(define $axioms-of-groups-completion-result-not-interreduced
+(define $axioms-of-group-completion-result-not-interreduced
   {
    <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
    <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Var 0>}> <Compound "e" {}>>
@@ -185,7 +185,7 @@
    <Equation <Compound "i" {<Compound "*" {<Var 1> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Compound "i" {<Var 1>}>}>>
  })
 
-(define $axioms-of-groups-completion-result
+(define $axioms-of-group-completion-result
   {
    <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
    <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Var 0>}> <Compound "e" {}>>

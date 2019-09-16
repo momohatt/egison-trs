@@ -124,50 +124,53 @@
 
 ; assumes that the two input lists have the same length
 (define $lpo?
-  (match-lambda [(list term) (list term)]
-    {[[<cons $s $sx> <cons ,s $tx>]
-        (lpo? sx tx)]
-     [[<cons $s _> <cons ?(succ? s $) _>] #t]
+  (match-lambda [something (list term) (list term)]
+    {[[$fn-ord <cons $s $sx> <cons ,s $tx>]
+        (lpo? fn-ord sx tx)]
+     [[$fn-ord <cons $s _> <cons ?(succ? fn-ord s $) _>] #t]
      [_ #f]}))
 
 (define $terminate?
-  (lambda [$x $ts]
-    (all (succ? x $) ts)))
+  (lambda [$fn-ord $x $ts]
+    (all (succ? fn-ord x $) ts)))
 
 (define $sigord
-  (lambda [$f $g]
-    (gt? (weight f) (weight g))))
+  (lambda [$fn-ord $f $g]
+    (match fn-ord (list something)
+      {[<join _ <cons ,g <join _ <cons ,f _>>>> #t]
+       [<join _ <cons ,f <join _ <cons ,g _>>>> #f]
+       [_ undefined]})))
 
 ; Lexicographic Path Order
 (define $ord-t
-  (lambda [$x $y]
+  (lambda [$fn-ord $x $y]
     (match [x y] [term term]
       {[[_ ,x] <Equal>]
        [(| [<compound $f $ss>
-            <compound ,f (& ?(lpo? ss $) ?(terminate? x $))>]
+            <compound ,f (& ?(lpo? fn-ord ss $) ?(terminate? fn-ord x $))>]
            [<compound _ <join _ <cons ,y _>>>
             _]
            [<compound _ <join _ <cons $s _>>>
-            ?(succ? s $)]
+            ?(succ? fn-ord s $)]
            [<compound $f _>
-            <compound ?(sigord f $) ?(terminate? x $)>])
+            <compound ?(sigord fn-ord f $) ?(terminate? fn-ord x $)>])
           <Greater>]
        [(| [<compound $f
-              (& (later ?(lpo? ss $)) ?(terminate? y $))>
+              (& (later ?(lpo? fn-ord ss $)) ?(terminate? fn-ord y $))>
             <compound ,f $ss>]
            [_
             <compound _ <join _ <cons ,x _>>>]
-           [(later ?(succ? s $))
+           [(later ?(succ? fn-ord s $))
             <compound _ <join _ <cons $s _>>>]
-           [<compound $f ?(terminate? y $)>
-            <compound ?(sigord $ f) _>])
+           [<compound $f ?(terminate? fn-ord y $)>
+            <compound ?(sigord fn-ord $ f) _>])
           <Less>]
        [_ <Undefined>]})))
 
 ; x \succ? y?
 (define $succ?
-  (lambda [$x $y]
-    (eq? (ord-t x y) <Greater>)))
+  (lambda [$fn-ord $x $y]
+    (eq? (ord-t fn-ord x y) <Greater>)))
 
 ;;==============================================================================
 

@@ -1,6 +1,6 @@
 # egison-trs
 
-Egison Journal vol.2「Egisonで項書き換え系」のレポジトリです
+技術書典7 Egison Journal vol.2「Egisonで項書き換え系」のレポジトリです
 
 ## Contents
 * `src-egi` : Egison implementation of Knuth-Bendix completion

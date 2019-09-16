@@ -38,8 +38,8 @@
           (critical-pairs eq1 eq2)]}))))
 
 (define $orient
-  (lambda [$l $r]
-    (match (ord-t l r) ordering
+  (lambda [$fn-ord $l $r]
+    (match (ord-t fn-ord l r) ordering
       {[<greater> (Just (eql l r))]
        [<less>    (Just (eql r l))]
        [_         Nothing]})))
@@ -53,9 +53,9 @@
 
 (define $term-pair
   (matcher
-    {[<normalize-and-orient ,$eqs $> equation
+    {[<normalize-and-orient ,$fn-ord ,$eqs $> equation
       {[[$l $r]
-        (orient (rewrite eqs l) (rewrite eqs r))]
+        (orient fn-ord (rewrite eqs l) (rewrite eqs r))]
        [_ {}]}]
      [[$ $] [term term]
       {[[$l $r] {[l r]}]}]
@@ -64,7 +64,7 @@
 
 ; simpler but slower
 (define $complete-loop-slow
-  (lambda [$eqs $crits]
+  (lambda [$fn-ord $eqs $crits]
     (io (do {[(report eqs crits {})]}
       (return
         (match crits (multiset term-pair)
@@ -72,17 +72,18 @@
            [<nil> eqs]
 
            [<cons ?(joinable? eqs $ $) $crits'>
-            (complete-loop-slow eqs crits')]
-           [<cons <normalize-and-orient ,eqs $new-eq> $crits'>
+            (complete-loop-slow fn-ord eqs crits')]
+           [<cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $crits'>
             (let {[$new-crits
                     (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop-slow (interreduce {@eqs new-eq})
+                  (complete-loop-slow fn-ord
+                                      (interreduce {@eqs new-eq})
                                       {@crits' @new-crits}))]
            [_ {}]
            }))))))
 
 (define $complete-loop
-  (lambda [$eqs $crits $deferred]
+  (lambda [$fn-ord $eqs $crits $deferred]
     (io (do {[(report eqs crits deferred)]} ; 途中経過の出力
       (return
         ; Note how deferred critical pair should be treated as 'multiset'
@@ -92,31 +93,33 @@
 
            ; No pending critical pairs, but there are some deferred ones
            [[<nil> <cons ?(joinable? $ $) $defs'>]
-            (complete-loop eqs crits defs')]
-           [[<nil> <cons <normalize-and-orient ,eqs $new-eq> $defs'>]
+            (complete-loop fn-ord eqs crits defs')]
+           [[<nil> <cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $defs'>]
             (let {[$new-crits
                     (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop (interreduce {@eqs (debug/fn show-equation new-eq)})
+                  (complete-loop fn-ord
+                                 (interreduce {@eqs (debug/fn show-equation new-eq)})
                                  new-crits
                                  defs'))]
            [[<nil> _] {}] ; completion failed
 
            ; There are some pending critical pairs
            [[<cons ?(joinable? eqs $ $) $crits'> _]
-            (complete-loop eqs crits' deferred)]
-           [[<cons <normalize-and-orient ,eqs $new-eq> $crits'> _]
+            (complete-loop fn-ord eqs crits' deferred)]
+           [[<cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $crits'> _]
             (let {[$new-crits
                     (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop (interreduce {@eqs (debug/fn show-equation new-eq)})
+                  (complete-loop fn-ord
+                                 (interreduce {@eqs (debug/fn show-equation new-eq)})
                                  {@crits' @new-crits}
                                  deferred))]
            [[<cons $lr $crits'> _]
-            (complete-loop eqs crits' (cons lr deferred))]
+            (complete-loop fn-ord eqs crits' (cons lr deferred))]
            }))))))
 
 (define $complete
-  (lambda [$eqs]
-    (complete-loop eqs (critical-pairs-for-set eqs) {})))
+  (lambda [$fn-ord $eqs]
+    (complete-loop fn-ord eqs (critical-pairs-for-set eqs) {})))
 
 ;; {equation} -> {equation}
 (define $interreduce

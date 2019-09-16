@@ -52,10 +52,6 @@
          [x (compose context context')])]
      [(& !<var _> $t) [t id]]}))
 
-(assert-equal "subterm-nonvar"
-  (map fst (subterm-nonvar (app "+" x (app "S" y))))
-  {(app "S" y) (app "+" x (app "S" y))})
-
 (define $occur
   (pattern-function [$v]
     (| <var v>
@@ -119,7 +115,6 @@
      [,"a" 1]
      [,"b" 1]
      [,"c" 1]
-     [,"d" 1]
      [,"*" 3]
      [,"i" 4]
      [,"f" 2]
@@ -148,6 +143,7 @@
   (lambda [$x $y]
     (match [x y] [term term]
       {[[_ ,x] <Equal>]
+       ; XXX: 'bottom' is used in superposition
        [[,bottom _] <Less>]
        [[_ ,bottom] <Greater>]
        [(| [<compound $f $ss>
@@ -178,28 +174,12 @@
 
 ;;==============================================================================
 
-; commonly-used variables
-(define $x (var 0))
-(define $y (var 1))
-(define $z (var 2))
-(define $w (var 3))
-
 ; bottom (used in superposition)
 (define $bottom (var -1))
 
-; commonly-used constants
-(define $a (app "a"))
-(define $b (app "b"))
-(define $c (app "c"))
-(define $d (app "d"))
-
 (define $show-term
   (match-lambda term
-    {[<var ,0> "x"]
-     [<var ,1> "y"]
-     [<var ,2> "z"]
-     [<var ,3> "w"]
-     [<var $x> (S.concat {"x" (show x)})]
+    {[<var $x> (S.concat {"x" (show x)})]
      [<compound $f ,{}> f]
      [<compound ,"+" <cons (& <compound ,"+" _> $x) <cons $y <nil>>>>
        (S.concat {"(" (show-term x) ") + " (show-term y)})]

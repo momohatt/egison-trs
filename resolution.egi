@@ -1,4 +1,6 @@
 ; Implementation of resolution principle for first-order logic in Egison
+;
+; XXX: This file is not related to Egison Journal vol.2
 
 (load-file "term.egi")
 

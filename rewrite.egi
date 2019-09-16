@@ -12,22 +12,6 @@
        [_ tm]
        })))
 
-(assert-equal "rewrite 1"
-  (rewrite axioms-of-nat (app "+" two one))
-  three)
-(assert-equal "rewrite 2"
-  (rewrite axioms-of-groups (p (p (i (var 4)) (var 4)) e))
-  e)
-(assert-equal "rewrite 3"
-  (rewrite axioms-of-groups (p (i (p (var 4) (var 5))) (p (var 4) (var 5))))
-  e)
-(assert-equal "rewrite 4"
-  (rewrite axioms-of-groups (p x e))
-  (p x e))
-(assert-equal "rewrite 5"
-  (rewrite axioms-of-nat (app "+" (app "S" (var 4)) (app "S" (var 5))))
-  (app "+" (var 4) (app "S" (app "S" (var 5)))))
-
 (define $joinable?
   (lambda [$axioms $s $t]
     (eq? (rewrite axioms s) (rewrite axioms t))))
@@ -58,6 +42,26 @@
 
 (load-file "example.egi")
 
+(assert-equal "rewrite 1"
+  (rewrite axioms-of-nat (app "+" two one))
+  three)
+(assert-equal "rewrite 2"
+  (rewrite axioms-of-groups (p (p (i x) x) e))
+  e)
+(assert-equal "rewrite 3"
+  (rewrite axioms-of-groups (p (i (p x y)) (p x y)))
+  e)
+(assert-equal "rewrite 4"
+  (rewrite axioms-of-groups (p x e))
+  (p x e))
+(assert-equal "rewrite 5"
+  (rewrite axioms-of-nat (app "+" (app "S" x) (app "S" y)))
+  (app "+" x (app "S" (app "S" y))))
+(assert-equal "rewrite 6"
+  ; i(i((b * c) * a) * b) * i(a) = c
+  (rewrite axioms-of-groups-complete (p (i (p (i (p (p b c) a)) b)) (i a)))
+  c)
+
 (assert-equal "rewrite-all-1"
   (solve axioms-of-nat (eql (app "+" two one) three))
   <PROVEN>)
@@ -69,16 +73,7 @@
                             (app "+" x (app "S" (app "S" y)))))
   <PROVEN>)
 
-(define $g1 (eql (i (p a a')) e))
-
 (assert-equal "rewrite-all-3"
-  (solve axioms-of-groups-complete g1)
+  ; i(a * i(a))
+  (solve axioms-of-groups-complete (eql (i (p a (i a))) e))
   <PROVEN>)
-
-; i(i((b * c) * d) * b) * i(d) = c
-(define $g2' (p (i (p (i (p (p b c) d)) b))
-                (i d)))
-
-(assert-equal "rewrite"
-  (rewrite axioms-of-groups-complete g2')
-  c)

@@ -97,7 +97,7 @@
            [[<nil> <cons <normalize-and-orient ,eqs $new-eq> $defs'>]
             (let {[$new-crits
                     (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop (interreduce {@eqs new-eq})
+                  (complete-loop (interreduce {@eqs (debug/fn show-equation new-eq)})
                                  new-crits
                                  defs'))]
            [[<nil> _] {}] ; completion failed
@@ -108,7 +108,7 @@
            [[<cons <normalize-and-orient ,eqs $new-eq> $crits'> _]
             (let {[$new-crits
                     (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop (interreduce {@eqs new-eq})
+                  (complete-loop (interreduce {@eqs (debug/fn show-equation new-eq)})
                                  {@crits' @new-crits}
                                  deferred))]
            [[<cons $lr $crits'> _]

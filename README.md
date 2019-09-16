@@ -10,7 +10,7 @@ $ egison
 > (complete axioms-of-groups) ; takes about 5 minutes
 ```
 
-### Result
+### Completion result of `axioms-of-groups`
 interreduced:
 ```
 > (load-file "completion.egi")
@@ -22,3 +22,6 @@ not interreduced:
 > (load-file "completion.egi")
 > (show-equations axioms-of-groups-completion-result)
 ```
+
+## Acknowledgement
+Part of the program was authored by [Yuichi Nishiwaki](https://github.com/nyuichi).

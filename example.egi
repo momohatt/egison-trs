@@ -1,3 +1,15 @@
+; commonly-used variables
+(define $x (var 0))
+(define $y (var 1))
+(define $z (var 2))
+
+; commonly-used constants
+(define $a (app "a"))
+(define $b (app "b"))
+(define $c (app "c"))
+
+;;==============================================================================
+
 (define $p (app "*" $1 $2)) ; product
 (define $i (app "i" $1))    ; inverse
 (define $e (app "e"))
@@ -8,6 +20,7 @@
    (eql (p (p x y) z) (p x (p y z)))
   })
 
+; This seems to diverge
 (define $axioms-of-groups-right
   {(eql (p x e) x)             ; x * e = x
    (eql (p x (i x)) e)         ; x * (i x) = e
@@ -34,6 +47,7 @@
 (define $three (app "S" (app "S" (app "S" (app "O")))))
 (define $four  (app "S" (app "S" (app "S" (app "S" (app "O"))))))
 
+; This is already complete
 (define $axioms-of-nat
    ; O + x = x
   {(eql (app "+" zero x) x)
@@ -41,18 +55,14 @@
    (eql (app "+" (app "S" x) y) (app "+" x (app "S" y)))
    })
 
-(define $p7 (eql (app "+" one two) three))
-(define $p8 (eql (app "+" zero two) two))
-
 ;;==============================================================================
 
-; small example from
-; https://github.com/mir-ikbch/compl_coq/blob/8.5/test-suite/test.v
+; Central groupoid (K&B (1970) example 6)
 
 (define $op (app "*" $1 $2))
 
-; (x * y) * (y * z) = y
-(define $axioms-ikebuchi
+(define $axiom-central-groupoid
+  ; (x * y) * (y * z) = y
   {(eql (op (op x y) (op y z)) y)})
 
 ; completion result:
@@ -62,10 +72,23 @@
 
 ; ex.
 ; ((a * b) * (b * c)) * ((b * c) * c) = b * c
-(assert-equal "axioms-ikebuchi"
-  (rewrite (complete axioms-ikebuchi)
+(assert-equal "axiom-central-groupoid"
+  (rewrite (complete axiom-central-groupoid)
            (op (op (op a b) (op b c)) (op (op b c) c)))
   (op b c))
+
+;;==============================================================================
+
+; Inverse property (K&B (1970) example 4)
+
+(define $axiom-inverse
+  ; (i x) * (x * y) = y
+  {(eql (p (i x) (p x y)) y)})
+
+; completion result:
+; {i(x) * x * y = y,
+;  i(i(x)) * z = x * z,
+;  y * i(y) * x4 = x4}
 
 ;;==============================================================================
 
@@ -89,3 +112,9 @@
    (eql (app "B" x) (app "W" (app "S" x))) ; B = W S
    (eql (app "B" (app "B" x)) (app "B" x)) ; B B = B
    })
+
+; completion result:
+; {S(W(x)) = W(x),
+;  B(x) = W(S(x)),
+;  W(W(S(x))) = W(S(x)),
+;  W(W(W(x))) = W(W(x))}

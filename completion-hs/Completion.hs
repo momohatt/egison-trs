@@ -73,31 +73,6 @@ crit1 e1@(Eq(l1, r1)) e2@(Eq(l2, r2)) =
         Just sigma ->
           (subst sigma r1, subst sigma $ context r2) : acc
 
--- -- Implementation in the textbook
--- listcases :: (Term -> (Substitution -> Term -> (Term, Term)) -> [(Term, Term)])
---           -> (Substitution -> [Term] -> (Term, Term))
---           -> [Term]
---           -> [(Term, Term)]
---           -> [(Term, Term)]
--- listcases fn rfn [] acc = acc
--- listcases fn rfn (x:xs) acc =
---   fn x (\sigma x' -> rfn sigma (x':xs)) ++
---     listcases fn (\sigma xs' -> rfn sigma (x:xs')) xs acc
---
--- overlaps :: (Term, Term) -> Term
---          -> (Substitution -> Term -> (Term, Term))
---          -> [(Term, Term)]
--- overlaps (l, r) (Var _) rfn = []
--- overlaps (l, r) tm@(Compound f xs) rfn =
---   let acc = (case unify [] [(l, tm)] of
---                Just sth -> [rfn sth r]
---                Nothing -> [])
---    in listcases (overlaps (l, r)) (\sigma a -> rfn sigma (Compound f a)) xs acc
---
--- crit2 :: Equation -> Equation -> [CriticalPair]
--- crit2 (Eq(l1, r1)) (Eq(l2, r2)) =
---   overlaps (l1, r1) l2  $ \sigma t -> (subst sigma t, subst sigma r2)
-
 criticalPairs :: Equation -> Equation -> [CriticalPair]
 criticalPairs = criticalPairs' crit1
   where
@@ -117,40 +92,22 @@ normalizeAndOrient :: (Term -> Term -> Bool) -> [Equation] -> (Term, Term)
 normalizeAndOrient ord eqs (s, t) =
   orient ord (rewrite eqs s, rewrite eqs t)
 
--- rewrite :: [Equation] -> Term -> Term
--- rewrite axioms tm =
---   case rewrite' axioms tm of
---     Just tm' -> rewrite axioms tm'
---     Nothing -> tm
---   where
---     rewrite' [] tm = Nothing
---     rewrite' ((Eq(s, t)):axioms) tm =
---       case rewrite'' (s, t) (subterms tm) of
---         Nothing -> rewrite' axioms tm
---         Just tm -> Just tm
---     rewrite'' (s, t) [] = Nothing
---     rewrite'' (s, t) ((subtm, ctx):xs) =
---       case termMatch [] [(s, subtm)] of
---         Just sigma -> Just $ ctx (subst sigma t)
---         Nothing -> rewrite'' (s, t) xs
-
 rewrite :: [Equation] -> Term -> Term
 rewrite axioms tm =
-  case rewrite1 axioms tm of
+  case rewrite' axioms tm of
     Just tm' -> rewrite axioms tm'
-    Nothing ->
-      case tm of
-        Var _ -> tm
-        Compound f xs ->
-          let tm' = Compound f (map (rewrite axioms) xs)
-           in if tm' == tm then tm else rewrite axioms tm'
-
-rewrite1 :: [Equation] -> Term -> Maybe Term
-rewrite1 [] t = Nothing
-rewrite1 (Eq(l, r) : axioms) t =
-  case termMatch [] [(l, t)] of
-    Just sigma -> Just $ subst sigma r
-    Nothing -> rewrite1 axioms t
+    Nothing -> tm
+  where
+    rewrite' [] tm = Nothing
+    rewrite' ((Eq(s, t)):axioms) tm =
+      case rewrite'' (s, t) (subterms tm) of
+        Nothing -> rewrite' axioms tm
+        Just tm -> Just tm
+    rewrite'' (s, t) [] = Nothing
+    rewrite'' (s, t) ((subtm, ctx):xs) =
+      case termMatch [] [(s, subtm)] of
+        Just sigma -> Just $ ctx (subst sigma t)
+        Nothing -> rewrite'' (s, t) xs
 
 reportStatus :: ([Equation], [CriticalPair], [CriticalPair]) -> [Equation] -> IO ()
 reportStatus (eqs, deferred, crits) eqs0 = do
@@ -158,7 +115,6 @@ reportStatus (eqs, deferred, crits) eqs0 = do
     putStrLn $ show (length eqs) ++ " equations and " ++
       show (length crits) ++ " pending critical pairs; " ++
         show (length deferred) ++ " deferred"
-    -- print $ head eqs
 
 
 -- one step completion
@@ -197,7 +153,6 @@ complete' ord (eqs, deferred, []) =
     Just e -> complete' ord (eqs, filter (/= e) deferred, [e])
     Nothing -> do
       print eqs
-      -- print deferred
       return Nothing
 complete' ord (eqs, deferred, (s, t):oldcrits) = do
   let s' = rewrite eqs s
@@ -300,10 +255,6 @@ axiomIkebuchi :: [Equation]
 axiomIkebuchi =
   [Eq (mult (mult x y) (mult y z), y)]
 
-eq0 = Eq (mult (mult x y) (mult y z), y)
-eq1 = Eq (mult (Var "x4") (mult (mult (Var "x4") (Var "x5")) (Var "x2")), mult (Var "x4") (Var "x5"))
-eq2 = Eq (mult (mult (Var "x0") (mult (Var "x3") (Var "x4"))) (Var "x4"), mult (Var "x3") (Var "x4"))
-
 e = Compound "e" []
 i x = Compound "i" [x]
 
@@ -330,9 +281,3 @@ axiomsOfNat :: [Equation]
 axiomsOfNat =
   [Eq (plus zero x, x),
    Eq (plus (succ x) y, plus x (succ y))]
-
-
-initTriplets =
-  let eqs = axiomsOfGroup
-   in (eqs, [], nub $ concat [criticalPairs e1 e2 | e1 <- eqs, e2 <- eqs])
-ord = lpoGe $ weight ["e", "i", "*"]

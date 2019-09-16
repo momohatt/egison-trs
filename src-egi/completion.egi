@@ -39,11 +39,10 @@
 
 (define $orient
   (lambda [$l $r]
-    (if (succ? l r)
-        (Just (eql l r))
-        (if (succ? r l)
-            (Just (eql r l))
-            Nothing))))
+    (match (ord-t l r) ordering
+      {[<greater> (Just (eql l r))]
+       [<less>    (Just (eql r l))]
+       [_         Nothing]})))
 
 (define $report
   (lambda [$eqs $crits $deferred]

@@ -12,7 +12,7 @@
 $ cd src-egi
 $ egison
 > (load-file "completion.egi")
-> (show-equations (complete axioms-of-group)) ; takes about 5 minutes
+> (show-equations (complete {"e" "*" "i"} axioms-of-group)) ; takes about 5 minutes
 ```
 
 ### Haskell

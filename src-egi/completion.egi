@@ -74,11 +74,10 @@
            [<cons ?(joinable? eqs $ $) $crits'>
             (complete-loop-slow fn-ord eqs crits')]
            [<cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $crits'>
-            (let {[$new-crits
-                    (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop-slow fn-ord
-                                      (interreduce {@eqs new-eq})
-                                      {@crits' @new-crits}))]
+            (let {[$new-crits (critical-pairs-for-new-eq new-eq eqs)]}
+              (complete-loop-slow fn-ord
+                                  (interreduce {@eqs new-eq})
+                                  {@crits' @new-crits}))]
            [_ {}]
            }))))))
 
@@ -95,24 +94,22 @@
            [[<nil> <cons ?(joinable? $ $) $defs'>]
             (complete-loop fn-ord eqs crits defs')]
            [[<nil> <cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $defs'>]
-            (let {[$new-crits
-                    (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop fn-ord
-                                 (interreduce {@eqs (debug/fn show-equation new-eq)})
-                                 new-crits
-                                 defs'))]
+            (let {[$new-crits (critical-pairs-for-new-eq new-eq eqs)]}
+              (complete-loop fn-ord
+                             (interreduce {@eqs (debug/fn show-equation new-eq)})
+                             new-crits
+                             defs'))]
            [[<nil> _] {}] ; completion failed
 
            ; There are some pending critical pairs
            [[<cons ?(joinable? eqs $ $) $crits'> _]
             (complete-loop fn-ord eqs crits' deferred)]
            [[<cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $crits'> _]
-            (let {[$new-crits
-                    (critical-pairs-for-new-eq new-eq eqs)]}
-                  (complete-loop fn-ord
-                                 (interreduce {@eqs (debug/fn show-equation new-eq)})
-                                 {@crits' @new-crits}
-                                 deferred))]
+            (let {[$new-crits (critical-pairs-for-new-eq new-eq eqs)]}
+              (complete-loop fn-ord
+                             (interreduce {@eqs (debug/fn show-equation new-eq)})
+                             {@crits' @new-crits}
+                             deferred))]
            [[<cons $lr $crits'> _]
             (complete-loop fn-ord eqs crits' (cons lr deferred))]
            }))))))

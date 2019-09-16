@@ -20,6 +20,8 @@
    (eql (p (p x y) z) (p x (p y z)))
   })
 
+; > (complete {"e" "*" "i"} axioms-of-group)
+
 ; This seems to diverge
 (define $axioms-of-group-right
   {(eql (p x e) x)             ; x * e = x
@@ -65,15 +67,17 @@
   ; (x * y) * (y * z) = y
   {(eql (op (op x y) (op y z)) y)})
 
+; > (complete {"*"} axiom-central-groupoid)
+;
 ; completion result:
-; {(x * y) * y * z = y,
-;  y * (y * w) * x7 = y * w,
-;  (x4 * x * y) * y = x * y}
+; {(x0 * x1) * x1 * x2 = x1,
+;  x1 * (x1 * x3) * x7 = x1 * x3,
+;  (x4 * x0 * x1) * x1 = x0 * x1}
 
 ; ex.
 ; ((a * b) * (b * c)) * ((b * c) * c) = b * c
 (assert-equal "axiom-central-groupoid"
-  (rewrite (complete axiom-central-groupoid)
+  (rewrite (complete {"*"} axiom-central-groupoid)
            (op (op (op a b) (op b c)) (op (op b c) c)))
   (op b c))
 
@@ -85,10 +89,12 @@
   ; (i x) * (x * y) = y
   {(eql (p (i x) (p x y)) y)})
 
+; > (complete {"*" "i"} axiom-inverse)
+;
 ; completion result:
-; {i(x) * x * y = y,
-;  i(i(x)) * z = x * z,
-;  y * i(y) * x4 = x4}
+; {i(x0) * x0 * x1 = x1,
+;  i(i(x0)) * x2 = x0 * x2,
+;  x1 * i(x1) * x4 = x4}
 
 ;;==============================================================================
 
@@ -98,9 +104,11 @@
 (define $axioms-plar
   {(eql (app "f" (app "f" x)) (app "g" x))})
 
+; > (complete {"f" "g"} axioms-plar)
+;
 ; completion result:
-; {f(f(x)) = g(x),
-;  g(f(x)) = f(g(x))}
+; {f(f(x0)) = g(x0),
+;  g(f(x0)) = f(g(x0))}
 
 ;;==============================================================================
 
@@ -113,8 +121,10 @@
    (eql (app "B" (app "B" x)) (app "B" x)) ; B B = B
    })
 
+; > (complete {"W" "S" "B"} rules-glass-replacement)
+;
 ; completion result:
-; {S(W(x)) = W(x),
-;  B(x) = W(S(x)),
-;  W(W(S(x))) = W(S(x)),
-;  W(W(W(x))) = W(W(x))}
+; {S(W(x0)) = W(x0),
+;  B(x0) = W(S(x0)),
+;  W(W(S(x0))) = W(S(x0)),
+;  W(W(W(x0))) = W(W(x0))}

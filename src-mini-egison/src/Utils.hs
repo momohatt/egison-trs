@@ -2,7 +2,7 @@
 
 module Utils where
 
-import           Conrtol.Egison
+import           Control.Egison
 
 data UnorderedPair a b = Pair a b
 instance (Matcher a, Matcher b) => Matcher (UnorderedPair a b)

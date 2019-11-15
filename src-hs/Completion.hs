@@ -1,6 +1,6 @@
 import           Data.List
 import           Data.Maybe
-import           Prelude                                hiding (Ordering, succ)
+import           Prelude    hiding (Ordering, succ)
 
 import           Types
 import           Parser
@@ -174,7 +174,7 @@ lexOrd ord _ _ = False
 lpoGt :: Ordering -> Term -> Term -> Bool
 lpoGt w s t =
   case (s, t) of
-    (_, Var x) -> s /= t &&  elem x (fv s)
+    (_, Var x) -> s /= t && elem x (fv s)
     (Compound f xs, Compound g ys) ->
       any (\si -> lpoGe w si t) xs ||
         all (lpoGt w s) ys &&
@@ -189,8 +189,8 @@ weight :: [String] -> Ordering
 weight list (f, n) (g, m)
   | f == g    = n > m
   | otherwise =
-    let (Just fi) = elemIndex f list
-        (Just gi) = elemIndex g list
+    let fi = fromJust $ elemIndex f list
+        gi = fromJust $ elemIndex g list
      in fi > gi
 
 --
@@ -204,20 +204,20 @@ a = Compound "a" []
 b = Compound "b" []
 c = Compound "c" []
 
-zero = Compound "O" []
-one = Compound "S" [zero]
-two = Compound "S" [one]
+zero  = Compound "O" []
+one   = Compound "S" [zero]
+two   = Compound "S" [one]
 three = Compound "S" [two]
 
 mult x y = Compound "*" [x, y]
 plus x y = Compound "+" [x, y]
-succ x = Compound "S" [x]
+succ x   = Compound "S" [x]
 
-axiomIkebuchi :: [Equation]
-axiomIkebuchi =
+axiomCentralGroupoid :: [Equation]
+axiomCentralGroupoid =
   [Eq (mult (mult x y) (mult y z), y)]
 
-e = Compound "e" []
+e   = Compound "e" []
 i x = Compound "i" [x]
 
 axiomsOfGroup :: [Equation]

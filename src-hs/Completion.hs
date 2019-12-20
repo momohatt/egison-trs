@@ -4,7 +4,7 @@ import           Prelude    hiding (Ordering, succ)
 
 import           Types
 
-renamePair :: Entity a => (a, a) -> (a, a)
+renamePair :: Substitutable a => (a, a) -> (a, a)
 renamePair (tm1, tm2) =
   let fvs1 = fv tm1
       fvs2 = fv tm2

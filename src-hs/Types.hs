@@ -28,13 +28,13 @@ instance Show Equation where
   show (Eq(l, r)) = show l ++ " = " ++ show r
 
 
-class Entity a where
+class Substitutable a where
   fv :: a -> [String]
   subst1 :: (String, Term) -> a -> a
   subst :: Substitution -> a -> a
   occur :: String -> a -> Bool
 
-instance Entity Term where
+instance Substitutable Term where
   fv (Var x) = [x]
   fv (Compound f xs) = nub $ concatMap fv xs
 
@@ -49,7 +49,7 @@ instance Entity Term where
   occur x (Var y) = x == y
   occur x (Compound f xs) = any (occur x) xs
 
-instance Entity Equation where
+instance Substitutable Equation where
   fv (Eq(lhs, rhs)) = nub $ fv lhs ++ fv rhs
 
   subst1 xt (Eq(lhs, rhs))   = Eq (subst1 xt lhs, subst1 xt rhs)

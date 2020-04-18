@@ -1,178 +1,155 @@
-; term-related definition
+-- term-related definition
 
-(load-file "utils.egi")
+loadFile "utils.egi"
 
-(define $term
-  (matcher
-    {[<var $> integer
-      {[<Var $i> {i}]
-       [_ {}]}]
-     [<compound $ $> [string (list term)]
-      {[<Compound $s $l> {[s l]}]
-       [_ {}]}]
-     [<unify ,$t $> something
-      {[$s (unify {} {[s t]})]}]
-     [<term-match ,$t $> something
-      {[$s (term-match {} {[s t]})]}]
-     ; subterm at non-variable position
-     [<subterm-nonvar $ $> [term something]
-      {[$s (subterm-nonvar s)]}]
-     [$ something
-      {[$tgt {tgt}]}]}))
+term :=
+  matcher
+    | var $ as integer with
+      | Var $i -> [i]
+      | _ -> []
+    | compound $ $ as (string, list term) with
+      | Compound $s $l -> [(s, l)]
+      | _ -> []
+    | unify #$t $ as something with
+      | $s -> match unify [] [(s, t)] as maybe something with
+                | nothing -> []
+                | just $sigma -> [sigma]
+    | termMatch #$t $ as something with
+      | $s -> match termMatch [] [(s, t)] as maybe something with
+                | nothing -> []
+                | just $sigma -> [sigma]
+    -- subterm at non-variable position
+    | subtermNonvar $ $ as (term, something) with
+      | $s -> subtermNonvar s
+    | $ as something with
+      | $tgt -> [tgt]
 
-(define $var (lambda $n <Var n>))
+var n := Var n
 
-(define $app
-  (cambda $xs
-    (match xs (list something)
-      {[<cons $x $xs> <Compound x xs>]})))
+app :=
+  cambda xs ->
+    match xs as list something with
+      | $x :: $xs -> Compound x xs
 
-(define $tsubst
-  (match-lambda [something term]
-    {[[$u <var $n>]
-       (match u (multiset [integer term])
-         {[<cons [,n $t] _> t] ; subst規則があればsubst
-          [_ <Var n>]})]       ; なければそのまま
-     [[$u <compound $f $xs>]
-       <Compound f (map (tsubst u $1) xs)>]}))
+tsubst :=
+  \match as (something, term) with
+    | ($u, var $n) ->
+      match u as multiset (integer, term) with
+        | (#n, $t) :: _ -> t
+        | _ -> Var n
+    | ($u, compound $f $xs) -> Compound f (map 1#(tsubst u %1) xs)
 
-;; term -> {term, term -> term}
-(define $subterm
-  (match-all-lambda term
-    {[<compound $f <join $xs <cons <subterm $x $context> $xs'>>>
-       (let {[$context' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
-         [x (compose context context')])]
-     [$t [t id]]}))
+-- term -> (term, term -> term)
+subterm :=
+  \matchAll as term with
+    | compound $f ($xs ++ subterm $x $context :: $xs') ->
+      let context' x := Compound f (xs ++ x :: xs')
+       in (x, compose context context')
+    | $t -> (t, id)
 
-;; term -> {term, term -> term}
-(define $subterm-nonvar
-  (match-all-lambda term
-    {[<compound $f <join $xs <cons <subterm-nonvar $x $context> $xs'>>>
-       (let {[$context' (lambda [$x] <Compound f (append xs (cons x xs'))>)]}
-         [x (compose context context')])]
-     [(& !<var _> $t) [t id]]}))
+-- term -> (term, term -> term)
+subtermNonvar :=
+  \matchAll as term with
+    | compound $f ($xs ++ subtermNonvar $x $context :: $xs') ->
+      let context' x := Compound f (xs ++ x :: xs')
+       in (x, compose context context')
+    | !(var _) & $t -> (t, id)
 
-(define $occur
-  (pattern-function [$v]
-    (| <var v>
-       <compound _ <join _ <cons (occur v) _>>>)))
+occur := \v => var ~v | compound _ (_ ++ occur ~v :: _)
 
-(define $fv
-  (match-all-lambda term
-    {[(occur $v) v]}))
+fv :=
+  \matchAll as term with
+    | occur $v -> v
 
-(define $update
-  (match-lambda [[string term] something]
-    {[[[$x $t] $sigma] {@sigma [x (tsubst sigma t)]}]}))
+update :=
+  \match as ((string, term), something) with
+    | (($x, $t), $sigma) -> sigma ++ [(x, tsubst sigma t)]
 
-;; {[var term]} -> {[term term]} -> {[var term]}
-(define $unify
-  (lambda [$sigma $term-pairs]
-    (match term-pairs (list (unordered-pair term))
-      {[<nil> (Just sigma)]
-       [<cons [<var $x> <var ,x>] $ps>
-        (unify sigma ps)]
-       [<cons [<var $x> (& <compound _ _> (occur ,x))] _>
-        Nothing]
-       [<cons [<var $x> $t] $ps>
-        (let {[$ps' (map (lambda [$t1 $t2] [(tsubst {[x t]} t1) (tsubst {[x t]} t2)]) ps)]}
-          (match (unify sigma ps') (maybe something)
-            {[(nothing) Nothing]
-             [(just $sigma') (Just (update [x t] sigma'))]}))]
-       [<cons [<compound $f $xs> <compound ,f $ys>] $p'>
-        (if (eq? (length xs) (length ys))
-            (unify sigma {@(zip xs ys) @p'})
-            Nothing)]
-       [_ Nothing]})))
+-- [(var, term)] -> [(term, term)] -> Maybe [(var, term)]
+unify sigma termPairs :=
+  match termPairs as list (unorderedPair term) with
+    | [] -> Just sigma
+    | (var $x, var #x) :: $ps -> unify sigma ps
+    | (var $x, compound _ _ & occur #x) :: _ -> Nothing
+    | (var $x, $t) :: $ps ->
+      let ps' := map (\t1 t2 -> (tsubst [(x, t)] t1, tsubst [(x, t)] t2)) ps
+       in match unify sigma ps' as maybe something with
+            | nothing -> Nothing
+            | just $sigma' -> Just (update (x, t) sigma')
+    | (compound $f $xs, compound #f $ys) :: $p' ->
+      if length xs = length ys then unify sigma (zip xs ys ++ p') else Nothing
+    | _ -> Nothing
 
-;; {[var term]} -> {[term term]} -> {[var term]}
-(define $term-match
-  (lambda [$sigma $term-pairs]
-    (match term-pairs (list [term term])
-      {[<nil> (Just sigma)]
-       [<cons [<compound $f $xs>
-               <compound ,f (& $ys ?(lambda [$ys] (eq? (length xs) (length ys))))>] $p'>
-        (term-match sigma {@(zip xs ys) @p'})]
-       [<cons [<var $x> $t] $p'>
-        (match sigma (multiset [string term])
-          {[<cons [,x ,t]  _>  (term-match sigma p')]
-           [<cons [,x $t'] _> Nothing]
-           [_        (term-match (cons [x t] sigma) p')]})]
-       [_ Nothing]
-        })))
+-- [(var, term)] -> [(term, term)] -> Maybe [(var, term)]
+termMatch sigma termPairs :=
+  match termPairs as list (term, term) with
+    | [] -> Just sigma
+    | ( compound $f $xs
+      , compound #f ($ys & ?(\ys -> length xs = length ys)) ) :: $p' ->
+      termMatch sigma (zip xs ys ++ p')
+    | (var $x, $t) :: $p' ->
+      match sigma as multiset (string, term) with
+        | (#x, #t) :: _ -> termMatch sigma p'
+        | (#x, _) :: _ -> Nothing
+        | _ -> termMatch ((x, t) :: sigma) p'
+    | _ -> Nothing
 
-; ================================== LPO =======================================
+-- ================================= LPO =======================================
 
-; extend ordering of terms to lists of terms
-; assumes that the two input lists have the same length
-(define $lpo?
-  (match-lambda [something (list term) (list term)]
-    {[[$fn-ord <cons $s $sx> <cons ,s $tx>]
-        (lpo? fn-ord sx tx)]
-     [[$fn-ord <cons $s _> <cons ?(succ? fn-ord s $) _>] #t]
-     [_ #f]}))
+-- extend ordering of terms to lists of terms
+-- assumes that the two input lists have the same length
+lpo? :=
+  \match as (something, list term, list term) with
+    | ($fnOrd, $s :: $sx, #s :: $tx) -> lpo? fnOrd sx tx
+    | ($fnOrd, $s :: _, ?1#(succ? fnOrd s %1) :: _) -> True
+    | _ -> False
 
-(define $terminate?
-  (lambda [$fn-ord $x $ts]
-    (all (succ? fn-ord x $) ts)))
+terminate? fnOrd x ts := all 1#(succ? fnOrd x %1) ts
 
-(define $sigord ; f >? g
-  (lambda [$fn-ord $f $g]
-    (if (eq? f g)
-        #f
-        (match fn-ord (list something)
-          {[<join _ <cons ,g <join _ <cons ,f _>>>> #t]
-           [<join _ <cons ,f <join _ <cons ,g _>>>> #f]
-           [_ undefined]}))))
+-- f >? g
+sigord fnOrd f g :=
+  if f = g
+    then False
+    else match fnOrd as list something with
+      | _ ++ #g :: _ ++ #f :: _ -> True
+      | _ ++ #f :: _ ++ #g :: _ -> False
+      | _ -> undefined
 
-; Lexicographic Path Order
-(define $ord-t
-  (lambda [$fn-ord $x $y]
-    (match [x y] [term term]
-      {[[_ ,x] <Equal>]
-       [(| [<compound $f $ss>
-            <compound ,f (& ?(lpo? fn-ord ss $) ?(terminate? fn-ord x $))>]
-           [<compound _ <join _ <cons ,y _>>>
-            _]
-           [<compound _ <join _ <cons $s _>>>
-            ?(succ? fn-ord s $)]
-           [<compound $f _>
-            <compound ?(sigord fn-ord f $) ?(terminate? fn-ord x $)>])
-          <Greater>]
-       [(| [<compound $f
-              (& (later ?(lpo? fn-ord ss $)) ?(terminate? fn-ord y $))>
-            <compound ,f $ss>]
-           [_
-            <compound _ <join _ <cons ,x _>>>]
-           [(later ?(succ? fn-ord s $))
-            <compound _ <join _ <cons $s _>>>]
-           [<compound $f ?(terminate? fn-ord y $)>
-            <compound ?(sigord fn-ord $ f) _>])
-          <Less>]
-       [_ <Undefined>]})))
+-- Lexicographic Path Order
+ordT fnOrd x y :=
+  match (x, y) as (term, term) with
+    | (_, #x)
+    -> Equal
+    |   (compound $f $ss,           compound #f (?1#(lpo? fnOrd ss %1) & ?1#(terminate? fnOrd x %1)))
+      | (compound _ (_ ++ #y :: _), _)
+      | (compound _ (_ ++ $s :: _), ?1#(succ? fnOrd s %1))
+      | (compound $f _,             compound ?1#(sigord fnOrd f %1) ?1#(terminate? fnOrd x %1))
+    -> Greater
+    |   { (compound $f                          @                        , compound #f $ss)
+        ,              ?1#(lpo? fnOrd ss %1) & ?1#(terminate? fnOrd y %1) }
+      | (_, compound _ (_ ++ #x :: _))
+      | { (        @            , compound _ (_ ++ $s :: _))
+        ,  ?1#(succ?  fnOrd s %1) }
+      | (compound $f ?1#(terminate? fnOrd y %1), compound ?1#(sigord fnOrd %1 f) _)
+    -> Less
+    | _ -> Undefined
 
-; x \succ? y?
-(define $succ?
-  (lambda [$fn-ord $x $y]
-    (eq? (ord-t fn-ord x y) <Greater>)))
+-- x \succ? y
+succ? fnOrd x y := ordT fnOrd x y = Greater
 
-;;==============================================================================
+-- =============================================================================
 
-(define $show-term
-  (match-lambda term
-    {[<var $x> (S.concat {"x" (show x)})]
-     [<compound $f ,{}> f]
-     [<compound ,"+" <cons (& <compound ,"+" _> $x) <cons $y <nil>>>>
-       (S.concat {"(" (show-term x) ") + " (show-term y)})]
-     [<compound ,"+" <cons $x <cons $y <nil>>>>
-       (S.concat {(show-term x) " + " (show-term y)})]
-     [<compound ,"*" <cons (& <compound ,"*" _> $x) <cons $y <nil>>>>
-       (S.concat {"(" (show-term x) ") * " (show-term y)})]
-     [<compound ,"*" <cons $x <cons $y <nil>>>>
-       (S.concat {(show-term x) " * " (show-term y)})]
-     [<compound $f $xs>
-       (S.concat {f "(" (S.intercalate ", " (map show-term xs)) ")"})]
-    }))
+showTerm :=
+  \match as term with
+    | var $x -> S.concat ["x", show x]
+    | compound $f #[] -> f
+    | compound #"+" ((compound #"+" _ & $x) :: $y :: []) ->
+      S.concat ["(", showTerm x, ") + ", showTerm y]
+    | compound #"+" ($x :: $y :: []) -> S.concat [showTerm x, " + ", showTerm y]
+    | compound #"*" ((compound #"*" _ & $x) :: $y :: []) ->
+      S.concat ["(", showTerm x, ") * ", showTerm y]
+    | compound #"*" ($x :: $y :: []) -> S.concat [showTerm x, " * ", showTerm y]
+    | compound $f $xs ->
+      S.concat [f, "(", S.intercalate ", " (map showTerm xs), ")"]
 
-(define $show-terms
-  (col-show/fn show-term $1))
+showTerms := 1#(colShow/fn showTerm %1)

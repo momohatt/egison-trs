@@ -1,33 +1,32 @@
-(load-file "term.egi")
+loadFile "term.egi"
 
-(define $equation
-  (matcher
-    {[<equation $ $> [term term]  ; undirected equation
-      {[<Equation $l $r> {[l r] [r l]}]
-       [_ {}]}]
-     [<dequation $ $> [term term] ; directed equation
-      {[<Equation $l $r> {[l r]}]
-       [_ {}]}]
-     [$ something
-      {[$tgt {tgt}]}]
-     }))
+equation :=
+  matcher
+    -- undirected equation
+    | equation $ $ as (term, term) with
+      | Equation $l $r -> [(l, r), (r, l)]
+      | _ -> []
+    -- directed equation
+    | dequation $ $ as (term, term) with
+      | Equation $l $r -> [(l, r)]
+      | _ -> []
+    | $ as something with
+      | $tgt -> [tgt]
 
-(define $eql (lambda [$x $y] <Equation x y>))
+eql x y := Equation x y
 
-(define $efv
-  (lambda [$eq]
-    (match eq equation
-      {[<equation $l $r> (union (fv l) (fv r))]})))
+efv eq :=
+  match eq as equation with
+    | equation $l $r -> union (fv l) (fv r)
 
-(define $esubst
-  (match-lambda [something equation]
-    {[[$sigma <equation $l $r>] <Equation (tsubst sigma l) (tsubst sigma r)>]}))
+esubst :=
+  \match as (something, equation) with
+    | ($sigma, equation $l $r) -> Equation (tsubst sigma l) (tsubst sigma r)
 
-;;==============================================================================
+-- =============================================================================
 
-(define $show-equation
-  (match-lambda equation
-    {[<equation $x $y> (S.concat {(show-term x) " = " (show-term y)})]}))
+showEquation :=
+  \match as equation with
+    | equation $x $y -> S.concat [showTerm x, " = ", showTerm y]
 
-(define $show-equations
-  (col-show/fn show-equation $1))
+showEquations := 1#(colShow/fn showEquation %1)

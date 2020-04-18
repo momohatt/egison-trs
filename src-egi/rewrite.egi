@@ -1,79 +1,32 @@
-; Implementation of term rewriting system in Egison
+--
+-- Implementation of term rewriting system in Egison
+--
 
-(load-file "equation.egi")
+loadFile "equation.egi"
 
-; {equation} -> term -> term
-(define $rewrite
-  (lambda [$axioms $tm]
-    (match [tm axioms] [term (multiset equation)]
-      {[[<subterm-nonvar $subtm $context>
-         <cons <dequation <term-match ,subtm $sigma> $r> _>]
-        (rewrite axioms (context (tsubst sigma r)))]
-       [_ tm]
-       })))
+-- [equation] -> term -> term
+rewrite axioms tm :=
+  match (tm, axioms) as (term, multiset equation) with
+    | ( subtermNonvar $subtm $context
+      , dequation (termMatch #subtm $sigma) $r :: _ ) ->
+      rewrite axioms (context (tsubst sigma r))
+    | _ -> tm
 
-(define $joinable?
-  (lambda [$axioms $s $t]
-    (eq? (rewrite axioms s) (rewrite axioms t))))
+joinable? axioms s t :=
+  rewrite axioms s = rewrite axioms t
 
-; {equation} -> {term} -> {term}
-(define $rewrite-all
-  (lambda [$axioms $tms]
-    (match-all [tms axioms] [(multiset term) (multiset equation)]
-      {[[<cons <subterm-nonvar $subtm $context> _>
-         <cons <equation <term-match ,subtm $sigma> $r> _>]
-        (context (tsubst sigma r))]
-      })))
+-- [equation] -> [term] -> [term]
+rewriteAll axioms tms :=
+  matchAll (tms, axioms) as (multiset term, multiset equation) with
+    | ( subtermNonvar $subtm $context :: _
+      , equation (termMatch #subtm $sigma) $r :: _ ) -> context (tsubst sigma r)
 
-(define $rewrite-loop
-  (match-lambda [term (multiset term) (multiset equations)]
-    {[[$goal <cons ,goal _> _]
-      <PROVEN>]
-     [[$goal $tgt $axioms]
-      (rewrite-loop goal (debug/fn show-terms (rewrite-all axioms tgt)) axioms)]
-     }))
+rewriteLoop :=
+  \match as (term, multiset term, multiset equations) with
+    | ($goal, #goal :: _, _) -> PROVEN
+    | ($goal, $tgt, $axioms) ->
+      rewriteLoop goal (debug/fn showTerms (rewriteAll axioms tgt)) axioms
 
-(define $solve
-  (match-lambda [(multiset equation) equation]
-    {[[$axioms <dequation $l $r>] (rewrite-loop r {l} axioms)]
-     }))
-
-;;==============================================================================
-
-(load-file "example.egi")
-
-(assert-equal "rewrite 1"
-  (rewrite axioms-of-nat (app "+" two one))
-  three)
-(assert-equal "rewrite 2"
-  (rewrite axioms-of-groups (p (p (i x) x) e))
-  e)
-(assert-equal "rewrite 3"
-  (rewrite axioms-of-groups (p (i (p x y)) (p x y)))
-  e)
-(assert-equal "rewrite 4"
-  (rewrite axioms-of-groups (p x e))
-  (p x e))
-(assert-equal "rewrite 5"
-  (rewrite axioms-of-nat (app "+" (app "S" x) (app "S" y)))
-  (app "+" x (app "S" (app "S" y))))
-(assert-equal "rewrite 6"
-  ; i(i((b * c) * a) * b) * i(a) = c
-  (rewrite axioms-of-groups-complete (p (i (p (i (p (p b c) a)) b)) (i a)))
-  c)
-
-(assert-equal "rewrite-all-1"
-  (solve axioms-of-nat (eql (app "+" two one) three))
-  <PROVEN>)
-
-(assert-equal "rewrite-all-2"
-  ; with variable
-  ; S(S(x)) + y = x + S(S(y))
-  (solve axioms-of-nat (eql (app "+" (app "S" (app "S" x)) y)
-                            (app "+" x (app "S" (app "S" y)))))
-  <PROVEN>)
-
-(assert-equal "rewrite-all-3"
-  ; i(a * i(a))
-  (solve axioms-of-groups-complete (eql (i (p a (i a))) e))
-  <PROVEN>)
+solve :=
+  \match as (multiset equation, equation) with
+    | ($axioms, dequation $l $r) -> rewriteLoop r [l] axioms

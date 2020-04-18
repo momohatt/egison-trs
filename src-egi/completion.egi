@@ -1,199 +1,185 @@
-(load-file "rewrite.egi")
-(load-file "example.egi")
+loadFile "rewrite.egi"
 
-;;======================= Knuth-Bendix completion ==============================
+-- ======================= Knuth-Bendix completion =============================
 
-(define $rename-pair
-  (lambda [$eq1 $eq2]
-    (let* {[$fvs1 (efv eq1)]
-           [$fvs2 (efv eq2)]
-           [$sigma1 (zip fvs1 (map (lambda $x <Var x>) (from 0)))]
-           [$sigma2 (zip fvs2 (map (lambda $x <Var x>) (from (length fvs1))))]}
-      [(esubst sigma1 eq1) (esubst sigma2 eq2)]
-      )))
+renamePair eq1 eq2 :=
+  let fvs1 := efv eq1
+      fvs2 := efv eq2
+      sigma1 := zip fvs1 (map (\x -> Var x) (from 0))
+      sigma2 := zip fvs2 (map (\x -> Var x) (from (length fvs1)))
+   in (esubst sigma1 eq1, esubst sigma2 eq2)
 
-;; [equation equation] -> {[term term]}
-(define $critical-pairs
-  (lambda [$eq1 $eq2]
-    (match-all (rename-pair eq1 eq2) [equation equation]
-      {[[<dequation $l1 $r1>
-         <dequation <subterm-nonvar <unify ,l1 $sigma> $context> $r2>]
-        [(tsubst sigma r2) (tsubst sigma (context r1))]]
-       })))
+-- equation -> equation -> [(term, term)]
+criticalPairs eq1 eq2 :=
+  matchAll renamePair eq1 eq2 as (equation, equation) with
+    | ( dequation $l1 $r1
+      , dequation (subtermNonvar (unify #l1 $sigma) $context) $r2 ) ->
+      (tsubst sigma r2, tsubst sigma (context r1))
 
-;; equation -> {equation} -> {[term term]}
-(define $critical-pairs-for-new-eq
-  (lambda [$new-eq $old-eqs]
-    {@(critical-pairs new-eq new-eq)
-     @(concat (map (critical-pairs new-eq $) old-eqs))
-     @(concat (map (critical-pairs $ new-eq) old-eqs))
-     }))
+-- equation -> [equation] -> [(term, term)]
+criticalPairsForNewEq newEq oldEqs :=
+  criticalPairs newEq newEq ++
+    concat (map 1#(criticalPairs newEq %1) oldEqs) ++
+      concat (map 1#(criticalPairs %1 newEq) oldEqs)
 
-;; {equation} -> {[term term]}
-(define $critical-pairs-for-set
-  (lambda [$eqs]
-    (concat
-      (match-all eqs (set equation)
-        {[<cons $eq1 <cons $eq2 _>>
-          (critical-pairs eq1 eq2)]}))))
+-- [equation] -> [(term, term)]
+criticalPairsForSet eqs :=
+  concat
+    (matchAll eqs as set equation with
+      | $eq1 :: $eq2 :: _ -> criticalPairs eq1 eq2)
 
-(define $orient
-  (lambda [$fn-ord $l $r]
-    (match (ord-t fn-ord l r) ordering
-      {[<greater> (Just (eql l r))]
-       [<less>    (Just (eql r l))]
-       [_         Nothing]})))
+orient fnOrd l r :=
+  match ordT fnOrd l r as ordering with
+    | greater -> [eql l r]
+    | less -> [eql r l]
+    | _ -> []
 
-(define $report
-  (lambda [$eqs $crits $deferred]
-    (print
-      (S.concat {(show (length eqs)) " eqs, "
-                 (show (length crits)) " pending critical pairs; "
-                 (show (length deferred)) " deferred"}))))
+report eqs crits deferred :=
+  print
+    (S.concat
+       [ show (length eqs), " eqs, "
+       , show (length crits), " pending critical pairs; "
+       , show (length deferred), " deferred" ])
 
-(define $term-pair
-  (matcher
-    {[<normalize-and-orient ,$fn-ord ,$eqs $> equation
-      {[[$l $r]
-        (orient fn-ord (rewrite eqs l) (rewrite eqs r))]
-       [_ {}]}]
-     [[$ $] [term term]
-      {[[$l $r] {[l r]}]}]
-     [$ something
-      {[$tgt {tgt}]}]}))
+termPair :=
+  matcher
+    | normalizeAndOrient #$fnOrd #$eqs $ as equation with
+      | ($l, $r) -> orient fnOrd (rewrite eqs l) (rewrite eqs r)
+      | _ -> []
+    | ($, $) as (term, term) with
+      | ($l, $r) -> [(l, r)]
+    | $ as something with
+      | $tgt -> [tgt]
 
-; simpler but slower
-(define $complete-loop-slow
-  (lambda [$fn-ord $eqs $crits]
-    (io (do {[(report eqs crits {})]}
-      (return
-        (match crits (multiset term-pair)
-          {; No pending or deferred critical pairs
-           [<nil> eqs]
+-- simpler but slower
+completeLoopSlow fnOrd eqs crits :=
+  io do report eqs crits []
+        return
+          (match crits as multiset termPair with
+            -- No pending or deferred critical pairs
+            | [] -> eqs
+            | ?2#(joinable? eqs %1 %2) :: $crits' ->
+              completeLoopSlow fnOrd eqs crits'
+            | normalizeAndOrient #fnOrd #eqs $newEq :: $crits' ->
+              let newCrits := criticalPairsForNewEq newEq eqs
+               in completeLoopSlow
+                    fnOrd
+                    (interreduce (eqs ++ [newEq]))
+                    (crits' ++ newCrits)
+            | _ -> [])
 
-           [<cons ?(joinable? eqs $ $) $crits'>
-            (complete-loop-slow fn-ord eqs crits')]
-           [<cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $crits'>
-            (let {[$new-crits (critical-pairs-for-new-eq new-eq eqs)]}
-              (complete-loop-slow fn-ord
-                                  (interreduce {@eqs new-eq})
-                                  {@crits' @new-crits}))]
-           [_ {}]
-           }))))))
+completeLoop fnOrd eqs crits deferred :=
+  io do report eqs crits deferred -- 途中経過の出力
+        return
+          -- Note how deferred critical pair should be treated as 'multiset'
+          (match (crits, deferred) as (list termPair, multiset termPair) with
+            -- No pending or deferred critical pairs
+            | ([], []) -> eqs
 
-(define $complete-loop
-  (lambda [$fn-ord $eqs $crits $deferred]
-    (io (do {[(report eqs crits deferred)]} ; 途中経過の出力
-      (return
-        ; Note how deferred critical pair should be treated as 'multiset'
-        (match [crits deferred] [(list term-pair) (multiset term-pair)]
-           ; No pending or deferred critical pairs
-          {[[<nil> <nil>] eqs]
+            -- No pending critical pairs, but there are some deferred ones
+            | ([], ?2#(joinable? %1 %2) :: $defs') ->
+              completeLoop fnOrd eqs crits defs'
+            | ([], normalizeAndOrient #fnOrd #eqs $newEq :: $defs') ->
+              let newCrits := criticalPairsForNewEq newEq eqs
+               in completeLoop
+                    fnOrd
+                    (interreduce (eqs ++ [debug/fn showEquation newEq]))
+                    newCrits
+                    defs'
+            | ([], _) -> [] -- Completion failed
 
-           ; No pending critical pairs, but there are some deferred ones
-           [[<nil> <cons ?(joinable? $ $) $defs'>]
-            (complete-loop fn-ord eqs crits defs')]
-           [[<nil> <cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $defs'>]
-            (let {[$new-crits (critical-pairs-for-new-eq new-eq eqs)]}
-              (complete-loop fn-ord
-                             (interreduce {@eqs (debug/fn show-equation new-eq)})
-                             new-crits
-                             defs'))]
-           [[<nil> _] {}] ; completion failed
+            -- There are some pending critical pairs
+            | (?2#(joinable? eqs %1 %2) :: $crits', _) ->
+              completeLoop fnOrd eqs crits' deferred
+            | (normalizeAndOrient #fnOrd #eqs $newEq :: $crits', _) ->
+              let newCrits := criticalPairsForNewEq newEq eqs
+               in completeLoop
+                    fnOrd
+                    (interreduce (eqs ++ [debug/fn showEquation newEq]))
+                    (crits' ++ newCrits)
+                    deferred
+            | ($lr :: $crits', _) ->
+              completeLoop fnOrd eqs crits' (lr :: deferred))
 
-           ; There are some pending critical pairs
-           [[<cons ?(joinable? eqs $ $) $crits'> _]
-            (complete-loop fn-ord eqs crits' deferred)]
-           [[<cons <normalize-and-orient ,fn-ord ,eqs $new-eq> $crits'> _]
-            (let {[$new-crits (critical-pairs-for-new-eq new-eq eqs)]}
-              (complete-loop fn-ord
-                             (interreduce {@eqs (debug/fn show-equation new-eq)})
-                             {@crits' @new-crits}
-                             deferred))]
-           [[<cons $lr $crits'> _]
-            (complete-loop fn-ord eqs crits' (cons lr deferred))]
-           }))))))
+complete fnOrd eqs := completeLoop fnOrd eqs (criticalPairsForSet eqs) []
 
-(define $complete
-  (lambda [$fn-ord $eqs]
-    (complete-loop fn-ord eqs (critical-pairs-for-set eqs) {})))
+-- [equation] -> [equation]
+interreduce :=
+  \match as multiset equation with
+    | dequation $l $r :: ($others & ?1#(joinable? %1 l r)) ->
+      interreduce (debug/fn showEquations others)
+    | $eqs -> eqs
 
-;; {equation} -> {equation}
-(define $interreduce
-  (match-lambda (multiset equation)
-    {[<cons <dequation $l $r> (& $others ?(joinable? $ l r))>
-      (interreduce (debug/fn show-equations others))]
-     [$eqs eqs]
-     }))
+-- =============================================================================
 
-;;==============================================================================
+showTermPair :=
+  \match as (term, term) with
+    | ($l, $r) -> S.concat ["[", showTerm l, ", ", showTerm r, "]"]
 
-(define $show-term-pair
-  (match-lambda [term term]
-    {[[$l $r] (S.concat {"[" (show-term l) ", " (show-term r) "]"})]}))
+showTermPairs := 1#(colShow/fn showTermPair %1)
 
-(define $show-term-pairs
-  (col-show/fn show-term-pair $1))
+-- =============================================================================
 
-;;==============================================================================
+-- completion result without interreduction
+axiomsOfGroupCompletionResultNotInterreduced :=
+  [Equation (Compound "*" [Compound "e" [], Var 0]) (Var 0),
+   Equation (Compound "*" [Compound "i" [Var 0], Var 0]) (Compound "e" []),
+   Equation (Compound "*" [Compound "*" [Var 0, Var 1], Var 2]) (Compound "*" [Var 0, Compound "*" [Var 1, Var 2]]),
+   Equation (Compound "*" [Compound "i" [Var 0], Compound "*" [Var 0, Var 2]]) (Var 2),
+   Equation (Compound "*" [Compound "i" [Compound "e" []], Var 3]) (Var 3),
+   Equation (Compound "*" [Compound "i" [Compound "i" [Var 3]], Compound "e" []]) (Var 3),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 4, Var 5]], Compound "*" [Var 4, Compound "*" [Var 5, Var 3]]]) (Var 3),
+   Equation (Compound "*" [Compound "i" [Compound "i" [Var 0]], Var 2]) (Compound "*" [Var 0, Var 2]),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 0, Compound "e" []]], Compound "*" [Var 0, Var 5]]) (Var 5),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 0, Compound "i" [Var 5]]], Compound "*" [Var 0, Compound "e" []]]) (Var 5),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Compound "i" [Compound "*" [Var 2, Var 4]], Var 2]], Compound "e" []]) (Var 4),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 6, Compound "*" [Var 7, Var 5]]], Compound "*" [Var 6, Compound "*" [Var 7, Compound "*" [Var 5, Var 4]]]]) (Var 4),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 0, Compound "i" [Var 5]]] , Compound "*" [Var 0, Var 7] ]) (Compound "*" [Var 5, Var 7]),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Compound "i" [Compound "*" [Var 0, Var 2]], Var 0]] , Var 4]) (Compound "*" [Var 2, Var 4]),
+   Equation (Compound "*" [Var 1, Compound "i" [Var 1]]) (Compound "e" []),
+   Equation (Compound "*" [Var 1, Compound "*" [Compound "i" [Var 1], Var 4]]) (Var 4), Equation (Compound "*" [Var 1, Compound "e" []]) (Var 1),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 4, Compound "*" [Var 5, Compound "i" [Var 2]]]], Compound "*" [Var 4, Var 5]]) (Var 2),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 3, Compound "i" [Var 2]]], Var 3]) (Var 2),
+   Equation (Compound "i" [Compound "*" [Compound "i" [Compound "*" [Var 4, Compound "*" [Var 5, Var 3]]], Compound "*" [Var 4, Var 5]]]) (Var 3),
+   Equation (Compound "i" [Compound "*" [Compound "i" [Var 5], Compound "i" [Var 3]]]) (Compound "*" [Var 3, Var 5]),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 0, Compound "*" [Compound "i" [Compound "*" [Var 4, Var 6]], Var 4]]] , Var 0]) (Var 6),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 0, Compound "*" [Var 8, Compound "*" [Var 9, Var 7]]]] , Compound "*" [Var 0 , Compound "*" [Var 8, Compound "*" [Var 9, Compound "*" [Var 7, Var 6]]]]]) (Var 6),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 0, Compound "*" [Var 2, Compound "i" [Var 7]]]] , Compound "*" [Var 0, Compound "*" [Var 2, Var 9]]]) (Compound "*" [Var 7, Var 9]),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 0, Compound "*" [Compound "i" [Compound "*" [Var 7, Var 9]], Var 7]]] , Compound "*" [Var 0, Var 11]]) (Compound "*" [Var 9, Var 11]),
+   Equation (Compound "*" [Var 3, Compound "*" [Compound "i" [Compound "*" [Var 1, Var 3]], Var 1]]) (Compound "e" []),
+   Equation (Compound "*" [Var 3, Compound "*" [Compound "i" [Compound "*" [Var 1, Var 3]], Compound "*" [Var 1, Var 6]]]) (Var 6),
+   Equation (Compound "*" [Var 3, Compound "i" [Compound "*" [Compound "i" [Var 6], Var 3]]]) (Var 6),
+   Equation (Compound "i" [Compound "*" [Var 3, Compound "i" [Compound "*" [Var 1, Var 3]]]]) (Var 1),
+   Equation (Compound "*" [Var 3, Compound "*" [Compound "i" [Compound "*" [Var 6, Compound "*" [Var 8, Var 3]]], Compound "*" [Var 6, Compound "*" [Var 8, Var 10]]]]) (Var 10),
+   Equation (Compound "*" [Var 3, Compound "*" [Compound "i" [Compound "*" [Compound "i" [Var 7], Var 3]], Var 5]]) (Compound "*" [Var 7, Var 5]),
+   Equation (Compound "i" [Compound "e" []]) (Compound "e" []),
+   Equation (Compound "*" [Var 3, Compound "*" [Var 4, Compound "i" [Compound "*" [Var 3, Var 4]]]]) (Compound "e" []),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 2, Var 0]], Var 2]) (Compound "i" [Var 0]),
+   Equation (Compound "*" [Var 3, Compound "i" [Compound "i" [Compound "i" [Var 3]]]]) (Compound "e" []),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 2, Compound "*" [Var 4, Var 0]]], Compound "*" [Var 2, Var 4]]) (Compound "i" [Var 0]),
+   Equation (Compound "i" [Compound "*" [Var 0, Compound "i" [Var 5]]]) (Compound "*" [Var 5, Compound "i" [Var 0]]),
+   Equation (Compound "*" [Var 4 , Compound "*" [Var 5 ,Compound "*" [Compound "i" [Compound "*" [Var 4, Var 5]], Var 1]]]) (Var 1),
+   Equation (Compound "*" [Compound "i" [Compound "*" [Var 3, Var 0]], Compound "*" [Var 3, Var 1]]) (Compound "*" [Compound "i" [Var 0], Var 1]),
+   Equation (Compound "i" [Compound "*" [Compound "i" [Var 1], Var 0]]) (Compound "*" [Compound "i" [Var 0], Var 1]),
+   Equation (Compound "i" [Compound "i" [Var 0]]) (Var 0),
+   Equation (Compound "i" [Compound "*" [Var 1, Var 0]]) (Compound "*" [Compound "i" [Var 0], Compound "i" [Var 1]])]
 
-; completion result without interreduction
-(define $axioms-of-group-completion-result-not-interreduced
-  {
-   <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
-   <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Var 0>}> <Compound "e" {}>>
-   <Equation <Compound "*" {<Compound "*" {<Var 0> <Var 1>}> <Var 2>}> <Compound "*" {<Var 0> <Compound "*" {<Var 1> <Var 2>}>}>>
-   <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Compound "*" {<Var 0> <Var 2>}>}> <Var 2>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "e" {}>}> <Var 3>}> <Var 3>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "i" {<Var 3>}>}> <Compound "e" {}>}> <Var 3>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Var 5>}>}> <Compound "*" {<Var 4> <Compound "*" {<Var 5> <Var 3>}>}>}> <Var 3>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "i" {<Var 0>}>}> <Var 2>}> <Compound "*" {<Var 0> <Var 2>}>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "e" {}>}>}> <Compound "*" {<Var 0> <Var 5>}>}> <Var 5>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "i" {<Var 5>}>}>}> <Compound "*" {<Var 0> <Compound "e" {}>}>}> <Var 5>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Compound "i" {<Compound "*" {<Var 2> <Var 4>}>}> <Var 2>}>}> <Compound "e" {}>}> <Var 4>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 6> <Compound "*" {<Var 7> <Var 5>}>}>}> <Compound "*" {<Var 6> <Compound "*" {<Var 7> <Compound "*" {<Var 5> <Var 4>}>}>}>}> <Var 4>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "i" {<Var 5>}>}>}> <Compound "*" {<Var 0> <Var 7>}>}> <Compound "*" {<Var 5> <Var 7>}>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Var 2>}>}> <Var 0>}>}> <Var 4>}> <Compound "*" {<Var 2> <Var 4>}>>
-   <Equation <Compound "*" {<Var 1> <Compound "i" {<Var 1>}>}> <Compound "e" {}>>
-   <Equation <Compound "*" {<Var 1> <Compound "*" {<Compound "i" {<Var 1>}> <Var 4>}>}> <Var 4>>
-   <Equation <Compound "*" {<Var 1> <Compound "e" {}>}> <Var 1>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Compound "*" {<Var 5> <Compound "i" {<Var 2>}>}>}>}> <Compound "*" {<Var 4> <Var 5>}>}> <Var 2>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 3> <Compound "i" {<Var 2>}>}>}> <Var 3>}> <Var 2>>
-   <Equation <Compound "i" {<Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Compound "*" {<Var 5> <Var 3>}>}>}> <Compound "*" {<Var 4> <Var 5>}>}>}> <Var 3>>
-   <Equation <Compound "i" {<Compound "*" {<Compound "i" {<Var 5>}> <Compound "i" {<Var 3>}>}>}> <Compound "*" {<Var 3> <Var 5>}>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Var 6>}>}> <Var 4>}>}>}> <Var 0>}> <Var 6>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "*" {<Var 8> <Compound "*" {<Var 9> <Var 7>}>}>}>}> <Compound "*" {<Var 0> <Compound "*" {<Var 8> <Compound "*" {<Var 9> <Compound "*" {<Var 7> <Var 6>}>}>}>}>}> <Var 6>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "*" {<Var 2> <Compound "i" {<Var 7>}>}>}>}> <Compound "*" {<Var 0> <Compound "*" {<Var 2> <Var 9>}>}>}> <Compound "*" {<Var 7> <Var 9>}>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 0> <Compound "*" {<Compound "i" {<Compound "*" {<Var 7> <Var 9>}>}> <Var 7>}>}>}> <Compound "*" {<Var 0> <Var 11>}>}> <Compound "*" {<Var 9> <Var 11>}>>
-   <Equation <Compound "*" {<Var 3> <Compound "*" {<Compound "i" {<Compound "*" {<Var 1> <Var 3>}>}> <Var 1>}>}> <Compound "e" {}>>
-   <Equation <Compound "*" {<Var 3> <Compound "*" {<Compound "i" {<Compound "*" {<Var 1> <Var 3>}>}> <Compound "*" {<Var 1> <Var 6>}>}>}> <Var 6>>
-   <Equation <Compound "*" {<Var 3> <Compound "i" {<Compound "*" {<Compound "i" {<Var 6>}> <Var 3>}>}>}> <Var 6>>
-   <Equation <Compound "i" {<Compound "*" {<Var 3> <Compound "i" {<Compound "*" {<Var 1> <Var 3>}>}>}>}> <Var 1>>
-   <Equation <Compound "*" {<Var 3> <Compound "*" {<Compound "i" {<Compound "*" {<Var 6> <Compound "*" {<Var 8> <Var 3>}>}>}> <Compound "*" {<Var 6> <Compound "*" {<Var 8> <Var 10>}>}>}>}> <Var 10>>
-   <Equation <Compound "*" {<Var 3> <Compound "*" {<Compound "i" {<Compound "*" {<Compound "i" {<Var 7>}> <Var 3>}>}> <Var 5>}>}> <Compound "*" {<Var 7> <Var 5>}>>
-   <Equation <Compound "i" {<Compound "e" {}>}> <Compound "e" {}>>
-   <Equation <Compound "*" {<Var 3> <Compound "*" {<Var 4> <Compound "i" {<Compound "*" {<Var 3> <Var 4>}>}>}>}> <Compound "e" {}>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 2> <Var 0>}>}> <Var 2>}> <Compound "i" {<Var 0>}>>
-   <Equation <Compound "*" {<Var 3> <Compound "i" {<Compound "i" {<Compound "i" {<Var 3>}>}>}>}> <Compound "e" {}>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 2> <Compound "*" {<Var 4> <Var 0>}>}>}> <Compound "*" {<Var 2> <Var 4>}>}> <Compound "i" {<Var 0>}>>
-   <Equation <Compound "i" {<Compound "*" {<Var 0> <Compound "i" {<Var 5>}>}>}> <Compound "*" {<Var 5> <Compound "i" {<Var 0>}>}>>
-   <Equation <Compound "*" {<Var 4> <Compound "*" {<Var 5> <Compound "*" {<Compound "i" {<Compound "*" {<Var 4> <Var 5>}>}> <Var 1>}>}>}> <Var 1>>
-   <Equation <Compound "*" {<Compound "i" {<Compound "*" {<Var 3> <Var 0>}>}> <Compound "*" {<Var 3> <Var 1>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Var 1>}>>
-   <Equation <Compound "i" {<Compound "*" {<Compound "i" {<Var 1>}> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Var 1>}>>
-   <Equation <Compound "i" {<Compound "i" {<Var 0>}>}> <Var 0>>
-   <Equation <Compound "i" {<Compound "*" {<Var 1> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Compound "i" {<Var 1>}>}>>
- })
-
-(define $axioms-of-group-completion-result
-  {
-   <Equation <Compound "*" {<Compound "e" {}> <Var 0>}> <Var 0>>
-   <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Var 0>}> <Compound "e" {}>>
-   <Equation <Compound "*" {<Compound "*" {<Var 0> <Var 1>}> <Var 2>}> <Compound "*" {<Var 0> <Compound "*" {<Var 1> <Var 2>}>}>>
-   <Equation <Compound "*" {<Compound "i" {<Var 0>}> <Compound "*" {<Var 0> <Var 2>}>}> <Var 2>>
-   <Equation <Compound "*" {<Var 1> <Compound "i" {<Var 1>}>}> <Compound "e" {}>>
-   <Equation <Compound "*" {<Var 1> <Compound "*" {<Compound "i" {<Var 1>}> <Var 4>}>}> <Var 4>>
-   <Equation <Compound "*" {<Var 1> <Compound "e" {}>}> <Var 1>>
-   <Equation <Compound "i" {<Compound "e" {}>}> <Compound "e" {}>>
-   <Equation <Compound "i" {<Compound "i" {<Var 0>}>}> <Var 0>>
-   <Equation <Compound "i" {<Compound "*" {<Var 1> <Var 0>}>}> <Compound "*" {<Compound "i" {<Var 0>}> <Compound "i" {<Var 1>}>}>>
-   })
+axiomsOfGroupCompletionResult :=
+  [ Equation (Compound "*" [Compound "e" [], Var 0]) (Var 0)
+  , Equation (Compound "*" [Compound "i" [Var 0], Var 0]) (Compound "e" [])
+  , Equation
+      (Compound "*" [Compound "*" [Var 0, Var 1], Var 2])
+      (Compound "*" [Var 0, Compound "*" [Var 1, Var 2]])
+  , Equation
+      (Compound "*" [Compound "i" [Var 0], Compound "*" [Var 0, Var 2]])
+      (Var 2)
+  , Equation (Compound "*" [Var 1, Compound "i" [Var 1]]) (Compound "e" [])
+  , Equation
+      (Compound "*" [Var 1, Compound "*" [Compound "i" [Var 1], Var 4]])
+      (Var 4)
+  , Equation (Compound "*" [Var 1, Compound "e" []]) (Var 1)
+  , Equation (Compound "i" [Compound "e" []]) (Compound "e" [])
+  , Equation (Compound "i" [Compound "i" [Var 0]]) (Var 0)
+  , Equation
+      (Compound "i" [Compound "*" [Var 1, Var 0]])
+      (Compound "*" [Compound "i" [Var 0], Compound "i" [Var 1]]) ]

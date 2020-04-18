@@ -8,11 +8,14 @@
 
 ## How to run completion
 ### Egison
+
+Requirement: Egison v4.0.0
+
 ```
 $ cd src-egi
 $ egison
-> (load-file "completion.egi")
-> (show-equations (complete {"e" "*" "i"} axioms-of-group)) ; takes about 5 minutes
+> loadFile "completion.egi"
+> showEquations (complete ["e", "*", "i"] axiomsOfGroup) ; takes about 5 minutes
 ```
 
 ### Haskell
